@@ -83,6 +83,39 @@ button {
 }
 .box .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
 .box .val { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Info tooltip on each rubriek box (pure CSS, hover + keyboard focus). */
+.info {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; margin-left: 4px; border-radius: 50%;
+  border: 1px solid var(--border); color: var(--muted);
+  font: italic 700 10px/1 Georgia, "Times New Roman", serif;
+  text-transform: none; letter-spacing: 0; cursor: help;
+  position: relative; vertical-align: middle;
+}
+.info:hover, .info:focus { color: var(--text); border-color: var(--accent); outline: none; }
+.info .tip {
+  position: absolute; top: calc(100% + 9px); left: 50%; transform: translateX(-50%);
+  width: 230px; max-width: 62vw; padding: 9px 11px;
+  background: var(--card-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  font: 400 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  text-transform: none; letter-spacing: 0; text-align: left;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  opacity: 0; visibility: hidden; transition: opacity 0.12s ease;
+  pointer-events: none; z-index: 10;
+}
+.info .tip strong { color: var(--text); }
+.info .tip em { color: var(--muted); font-style: italic; }
+.info .tip::before {
+  content: ""; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+  border: 6px solid transparent; border-bottom-color: var(--border);
+}
+.info:hover .tip, .info:focus .tip { opacity: 1; visibility: visible; }
+
+.logic-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+.logic-list li { color: var(--muted); font-size: 13px; }
+.logic-list strong { color: var(--text); }
 .box.highlight { border-color: var(--good); }
 .box.highlight .val { color: var(--good); }
 

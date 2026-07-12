@@ -47,11 +47,36 @@
     </section>
 
     <section class="totals" id="totals" aria-live="polite">
-      <div class="box"><span class="label">4a · net</span><span class="val" data-t="4a-net">&euro;0,00</span></div>
-      <div class="box"><span class="label">4a · VAT</span><span class="val" data-t="4a-vat">&euro;0,00</span></div>
-      <div class="box"><span class="label">4b · net</span><span class="val" data-t="4b-net">&euro;0,00</span></div>
-      <div class="box"><span class="label">4b · VAT</span><span class="val" data-t="4b-vat">&euro;0,00</span></div>
-      <div class="box highlight"><span class="label">5b · voorbelasting</span><span class="val" data-t="5b">&euro;0,00</span></div>
+      <div class="box">
+        <span class="label">4a · net
+          <span class="info" tabindex="0" aria-label="4a net: net amount of purchases from outside the EU where the VAT is reverse-charged to you (btw verlegd).">i<span class="tip" aria-hidden="true">Net of purchases from <strong>outside the EU</strong> with VAT reverse-charged to you (<em>btw verlegd</em>). You report the net here.</span></span>
+        </span>
+        <span class="val" data-t="4a-net">&euro;0,00</span>
+      </div>
+      <div class="box">
+        <span class="label">4a · VAT
+          <span class="info" tabindex="0" aria-label="4a VAT: VAT computed on the 4a net at the reverse-charge rate. Declared here and deducted again in 5b, so it nets to zero.">i<span class="tip" aria-hidden="true">VAT computed on the 4a net at the reverse-charge rate. Declared here <strong>and</strong> deducted again in 5b, so it nets to &euro;0.</span></span>
+        </span>
+        <span class="val" data-t="4a-vat">&euro;0,00</span>
+      </div>
+      <div class="box">
+        <span class="label">4b · net
+          <span class="info" tabindex="0" aria-label="4b net: net amount of purchases from within the EU (intra-community) where the VAT is reverse-charged to you.">i<span class="tip" aria-hidden="true">Net of purchases from <strong>within the EU</strong> (intra-community) with VAT reverse-charged to you. You report the net here.</span></span>
+        </span>
+        <span class="val" data-t="4b-net">&euro;0,00</span>
+      </div>
+      <div class="box">
+        <span class="label">4b · VAT
+          <span class="info" tabindex="0" aria-label="4b VAT: VAT computed on the 4b net. Declared here and deducted again in 5b, so it nets to zero.">i<span class="tip" aria-hidden="true">VAT computed on the 4b net. Declared here <strong>and</strong> deducted again in 5b, so it nets to &euro;0.</span></span>
+        </span>
+        <span class="val" data-t="4b-vat">&euro;0,00</span>
+      </div>
+      <div class="box highlight">
+        <span class="label">5b · voorbelasting
+          <span class="info" tabindex="0" aria-label="5b voorbelasting: total deductible input VAT. Your NL input VAT plus the reverse-charge VAT from 4a and 4b.">i<span class="tip" aria-hidden="true">Total <strong>deductible input VAT</strong> (voorbelasting): your NL input VAT <strong>plus</strong> the reverse-charge VAT from 4a and 4b.</span></span>
+        </span>
+        <span class="val" data-t="5b">&euro;0,00</span>
+      </div>
     </section>
 
     <section class="card">
@@ -77,17 +102,26 @@
     </section>
 
     <section class="card logic">
-      <p>
-        Logic: classification follows <code>Expense Tax Name 1</code>. Rows named
-        <code>Reverse Charge</code> → net + computed VAT into 4a (non-EU) or 4b (EU)
-        by country, and the same VAT into 5b. Rows named <code>VAT (NL)</code> →
-        their VAT into 5b only. Vendor country is taken from your saved map, else
-        detected inside the vendor name (e.g. brackets or after a dash like
-        <code>Acme – DE</code>), else you set it in the table. Non-EUR rows use the
-        Converted Amount when present, otherwise Amount × Exchange Rate. Nothing is
-        filed automatically — this only computes the numbers you type into Mijn
-        Belastingdienst.
-      </p>
+      <h3>How it works</h3>
+      <ul class="logic-list">
+        <li>Classification follows the <code>Expense Tax Name 1</code> column.</li>
+        <li>
+          <code>Reverse Charge</code> → net + computed VAT into
+          <strong>4a</strong> (non-EU) or <strong>4b</strong> (EU) by vendor
+          country; the same VAT also goes into <strong>5b</strong>.
+        </li>
+        <li><code>VAT (NL)</code> → its VAT into <strong>5b</strong> only.</li>
+        <li>
+          Vendor country: your saved map → detected in the vendor name
+          (brackets or after a dash, e.g. <code>Acme – DE</code>) → else you set
+          it in the table.
+        </li>
+        <li>Non-EUR rows use the Converted Amount when present, otherwise Amount × Exchange Rate.</li>
+        <li>
+          Nothing is filed automatically — this only computes the numbers you
+          type into Mijn Belastingdienst.
+        </li>
+      </ul>
     </section>
 
     <footer class="foot">Self-hosted · BTW Aangifte Helper</footer>
