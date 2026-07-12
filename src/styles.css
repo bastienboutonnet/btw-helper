@@ -104,6 +104,12 @@ th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--bor
 th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--card); }
 td[contenteditable] { cursor: text; }
 td[contenteditable]:focus { outline: 1px solid var(--accent); border-radius: 4px; background: var(--card-2); }
+td .country-input {
+  background: var(--card-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 6px; font-size: 13px; width: 150px;
+}
+td .country-input:focus { outline: 1px solid var(--accent); }
+td .country-input::placeholder { color: var(--muted); }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 tr.flagged td { background: rgba(242, 184, 75, 0.08); }
 .rubriek-tag { font-weight: 600; }

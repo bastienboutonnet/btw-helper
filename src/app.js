@@ -5,6 +5,68 @@ const EU_COUNTRIES = new Set([
   "LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"
 ]);
 
+// Full ISO 3166-1 alpha-2 code list. Country *names* come from Intl.DisplayNames
+// so only the codes are hardcoded (typo-proof names). EU_COUNTRIES still decides
+// 4a (non-EU) vs 4b (EU); everything here that isn't in EU_COUNTRIES is 4a.
+const COUNTRY_CODES = [
+  "AD","AE","AF","AG","AI","AL","AM","AO","AQ","AR","AS","AT","AU","AW","AX","AZ",
+  "BA","BB","BD","BE","BF","BG","BH","BI","BJ","BL","BM","BN","BO","BQ","BR","BS","BT","BV","BW","BY","BZ",
+  "CA","CC","CD","CF","CG","CH","CI","CK","CL","CM","CN","CO","CR","CU","CV","CW","CX","CY","CZ",
+  "DE","DJ","DK","DM","DO","DZ",
+  "EC","EE","EG","EH","ER","ES","ET",
+  "FI","FJ","FK","FM","FO","FR",
+  "GA","GB","GD","GE","GF","GG","GH","GI","GL","GM","GN","GP","GQ","GR","GS","GT","GU","GW","GY",
+  "HK","HM","HN","HR","HT","HU",
+  "ID","IE","IL","IM","IN","IO","IQ","IR","IS","IT",
+  "JE","JM","JO","JP",
+  "KE","KG","KH","KI","KM","KN","KP","KR","KW","KY","KZ",
+  "LA","LB","LC","LI","LK","LR","LS","LT","LU","LV","LY",
+  "MA","MC","MD","ME","MF","MG","MH","MK","ML","MM","MN","MO","MP","MQ","MR","MS","MT","MU","MV","MW","MX","MY","MZ",
+  "NA","NC","NE","NF","NG","NI","NL","NO","NP","NR","NU","NZ",
+  "OM",
+  "PA","PE","PF","PG","PH","PK","PL","PM","PN","PR","PS","PT","PW","PY",
+  "QA",
+  "RE","RO","RS","RU","RW",
+  "SA","SB","SC","SD","SE","SG","SH","SI","SJ","SK","SL","SM","SN","SO","SR","SS","ST","SV","SX","SY","SZ",
+  "TC","TD","TF","TG","TH","TJ","TK","TL","TM","TN","TO","TR","TT","TV","TW","TZ",
+  "UA","UG","UM","US","UY","UZ",
+  "VA","VC","VE","VG","VI","VN","VU",
+  "WF","WS",
+  "YE","YT",
+  "ZA","ZM","ZW",
+];
+const COUNTRY_CODE_SET = new Set(COUNTRY_CODES);
+
+let _regionNames = null;
+function countryName(code) {
+  if (!code) return "";
+  try {
+    if (!_regionNames) _regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+    return _regionNames.of(code) || code;
+  } catch { return code; }
+}
+
+// The combobox shows "Netherlands (NL)"; typing the code or the name filters it.
+function countryLabel(code) { return `${countryName(code)} (${code})`; }
+
+// name -> code, for resolving a typed full name that wasn't picked from the list.
+const NAME_TO_CODE = (() => {
+  const m = {};
+  for (const c of COUNTRY_CODES) m[countryName(c).toLowerCase()] = c;
+  return m;
+})();
+
+// Turn whatever the user typed/picked into a canonical code (or "" if unknown).
+function resolveCountry(raw) {
+  const s = (raw || "").trim();
+  if (!s) return "";
+  const paren = s.match(/\(([A-Za-z]{2})\)\s*$/); // "Netherlands (NL)"
+  if (paren && COUNTRY_CODE_SET.has(paren[1].toUpperCase())) return paren[1].toUpperCase();
+  if (/^[A-Za-z]{2}$/.test(s) && COUNTRY_CODE_SET.has(s.toUpperCase())) return s.toUpperCase();
+  const byName = NAME_TO_CODE[s.toLowerCase()];
+  return byName || "";
+}
+
 // Persisted vendor -> country map (localStorage).
 const VENDOR_MAP_KEY = "btw.vendorCountry";
 function loadVendorMap() {
@@ -68,8 +130,7 @@ function detectCountry(vendor) {
   return "";
 }
 function isCountryCode(code) {
-  return /^[A-Za-z]{2}$/.test(code) &&
-    (EU_COUNTRIES.has(code.toUpperCase()) || code.toUpperCase() === "GB" || code.toUpperCase() === "US" || code.toUpperCase() === "CH" || code.toUpperCase() === "NO");
+  return /^[A-Za-z]{2}$/.test(code) && COUNTRY_CODE_SET.has(code.toUpperCase());
 }
 
 function num(v) {
@@ -129,10 +190,9 @@ function classify(row, rcRate) {
       result.rubriek = "4a";
     }
   } else if (tax === "vat (nl)" || tax.startsWith("vat (nl")) {
-    // NL input VAT — needs a VAT amount. If none provided, flag it.
-    result.vatEur = 0; // amount comes from a VAT column if present; otherwise user edits
+    // NL input VAT (voorbelasting): derived from net, deductible in 5b only.
+    result.vatEur = eur * (rcRate / 100);
     result.rubriek = "5b";
-    result.flags.push("VAT (NL) row — confirm the input VAT amount in the VAT column.");
   } else if (tax) {
     result.rubriek = "none";
     result.flags.push(`Unrecognized Tax Name 1: "${row.tax}".`);
@@ -162,6 +222,7 @@ function euro(n) { return fmt.format(n || 0); }
 let state = { rows: [], rcRate: 21 };
 
 function render() {
+  ensureCountryDatalist();
   const { totals, classified } = computeTotals(state.rows, state.rcRate);
 
   for (const [key, val] of Object.entries(totals)) {
@@ -193,7 +254,7 @@ function render() {
     tr.appendChild(td(row.date, "date"));
     tr.appendChild(td(row.vendor, "vendor"));
     tr.appendChild(td(row.tax, "tax"));
-    tr.appendChild(td(row.country, "country"));
+    tr.appendChild(countryCell(row));
     tr.appendChild(td(row.net, "net", true, true));
     tr.appendChild(td(row.currency, "currency"));
     tr.appendChild(td(row.exchangeRate || "", "exchangeRate", true, true));
@@ -218,6 +279,37 @@ function td(value, field, editable = true, numeric = false) {
   return cell;
 }
 
+// One shared <datalist> of every country, built once and kept out of the tbody
+// (which render() wipes each pass). Options are "Netherlands (NL)" so the native
+// combobox filters as you type either the name or the code.
+const COUNTRY_LIST_ID = "country-codes";
+function ensureCountryDatalist() {
+  if (document.getElementById(COUNTRY_LIST_ID)) return;
+  const dl = document.createElement("datalist");
+  dl.id = COUNTRY_LIST_ID;
+  for (const code of COUNTRY_CODES) {
+    const opt = document.createElement("option");
+    opt.value = countryLabel(code);
+    dl.appendChild(opt);
+  }
+  document.body.appendChild(dl);
+}
+
+// Country cell: a searchable combobox bound to the shared datalist. Free typing
+// is allowed but resolved to a canonical code on change, so 4a/4b stays reliable.
+function countryCell(row) {
+  const cell = document.createElement("td");
+  const input = document.createElement("input");
+  input.type = "text";
+  input.setAttribute("list", COUNTRY_LIST_ID);
+  input.className = "country-input";
+  input.dataset.field = "country";
+  input.placeholder = "search…";
+  input.value = COUNTRY_CODE_SET.has(row.country) ? countryLabel(row.country) : (row.country || "");
+  cell.appendChild(input);
+  return cell;
+}
+
 // --- Edits recompute live ---
 document.querySelector("#rows tbody").addEventListener("blur", (e) => {
   const cell = e.target.closest("td[contenteditable]");
@@ -229,14 +321,25 @@ document.querySelector("#rows tbody").addEventListener("blur", (e) => {
   if (!row) return;
   const raw = cell.textContent.trim();
 
-  if (["net", "converted", "exchangeRate"].includes(field)) row[field] = num(raw);
-  else if (field === "country") {
-    row.country = raw.toUpperCase();
-    if (row.vendor) { vendorMap[row.vendor.trim().toLowerCase()] = row.country; saveVendorMap(vendorMap); }
-  }
+  if (["net", "exchangeRate"].includes(field)) row[field] = num(raw);
   else row[field] = raw;
   render();
 }, true);
+
+// Country is a combobox <input>, committing on "change" (blur / Enter / pick).
+// Resolve the typed/picked text to a canonical code, then persist to the
+// vendor->country map so the same vendor auto-fills next time.
+document.querySelector("#rows tbody").addEventListener("change", (e) => {
+  const input = e.target.closest("input[data-field='country']");
+  if (!input) return;
+  const tr = input.closest("tr");
+  const i = Number(tr.dataset.i);
+  const row = state.rows[i];
+  if (!row) return;
+  row.country = resolveCountry(input.value);
+  if (row.vendor) { vendorMap[row.vendor.trim().toLowerCase()] = row.country; saveVendorMap(vendorMap); }
+  render();
+});
 
 // --- File loading ---
 function ingest(text) {
@@ -264,14 +367,9 @@ fileInput.addEventListener("change", () => {
 
 document.getElementById("rcRate").addEventListener("input", (e) => {
   state.rcRate = num(e.target.value);
+  render();
 });
 document.getElementById("recalc").addEventListener("click", render);
-
-document.getElementById("loadSample").addEventListener("click", () => {
-  fetch("sample.csv").then(r => r.text()).then(ingest).catch(() => {
-    ingest(SAMPLE_CSV);
-  });
-});
 
 // Embedded fallback sample so the button works even without the file served.
 const SAMPLE_CSV = `Expense Date,Expense Vendor,Expense Net Amount,Expense Tax Name 1,Expense Currency,Expense Converted Amount,Expense Exchange Rate
@@ -282,5 +380,11 @@ const SAMPLE_CSV = `Expense Date,Expense Vendor,Expense Net Amount,Expense Tax N
 2026-05-19,Figma (US),144.00,Reverse Charge,USD,132.60,0.9208
 2026-06-01,KPN,60.00,VAT (NL),EUR,,
 2026-06-11,Some Vendor,30.00,,EUR,,`;
+
+document.getElementById("loadSample").addEventListener("click", () => {
+  fetch("sample.csv").then(r => r.text()).then(ingest).catch(() => {
+    ingest(SAMPLE_CSV);
+  });
+});
 
 render();
