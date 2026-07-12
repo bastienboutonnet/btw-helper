@@ -1,0 +1,8 @@
+Expense Date,Expense Vendor,Expense Net Amount,Expense Tax Name 1,Expense Currency,Expense Converted Amount,Expense Exchange Rate
+2026-04-03,Hetzner (DE),49.00,Reverse Charge,EUR,,
+2026-04-08,AWS - IE,120.50,Reverse Charge,EUR,,
+2026-04-12,GitHub (US),21.00,Reverse Charge,USD,19.35,0.9214
+2026-05-02,Coolblue,89.99,VAT (NL),EUR,,
+2026-05-19,Figma (US),144.00,Reverse Charge,USD,132.60,0.9208
+2026-06-01,KPN,60.00,VAT (NL),EUR,,
+2026-06-11,Some Vendor,30.00,,EUR,,

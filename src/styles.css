@@ -1,0 +1,123 @@
+:root {
+  --bg: #0f1115;
+  --card: #171a21;
+  --card-2: #1d2028;
+  --border: #2a2e38;
+  --text: #e6e8ec;
+  --muted: #9aa0ab;
+  --accent: #4f9cf9;
+  --accent-2: #2f6fd0;
+  --good: #3ecf8e;
+  --warn: #f2b84b;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; }
+
+.eyebrow {
+  text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px;
+  color: var(--muted); margin: 0 0 8px;
+}
+
+h1 { font-size: 32px; margin: 0 0 12px; }
+h2 { font-size: 18px; margin: 0 0 16px; }
+h3 { font-size: 15px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+
+.lede { color: var(--muted); max-width: 760px; margin: 0 0 28px; }
+.lede strong, .note strong { color: var(--text); }
+
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 18px;
+}
+
+.dropzone {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  padding: 32px; text-align: center; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dropzone:hover, .dropzone:focus, .dropzone.drag {
+  border-color: var(--accent); background: var(--card-2); outline: none;
+}
+.dropzone p { margin: 4px 0; }
+.hint { color: var(--muted); font-size: 13px; }
+
+.controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 16px;
+}
+.rate {
+  display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
+}
+.rate input {
+  width: 72px; background: var(--card-2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 6px 8px;
+}
+
+button {
+  border: none; border-radius: 8px; padding: 9px 16px; font-size: 14px;
+  cursor: pointer; font-weight: 600;
+}
+.btn-primary { background: var(--accent); color: #06101f; }
+.btn-primary:hover { background: var(--accent-2); color: #fff; }
+.btn-secondary { background: var(--card-2); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { border-color: var(--accent); }
+
+.note { background: var(--card-2); }
+.note p { margin: 0; color: var(--muted); }
+
+.totals {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px;
+}
+.box {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; display: flex; flex-direction: column; gap: 6px;
+}
+.box .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.box .val { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.box.highlight { border-color: var(--good); }
+.box.highlight .val { color: var(--good); }
+
+.count {
+  background: var(--card-2); border: 1px solid var(--border); border-radius: 20px;
+  padding: 1px 9px; font-size: 12px; color: var(--muted); font-weight: 600;
+}
+
+.flags { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.flags li {
+  background: var(--card-2); border-left: 3px solid var(--warn); border-radius: 6px;
+  padding: 10px 12px; font-size: 13px; color: var(--text);
+}
+.flags:empty::after { content: "No flags — everything classified cleanly."; color: var(--muted); font-size: 13px; }
+
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--card); }
+td[contenteditable] { cursor: text; }
+td[contenteditable]:focus { outline: 1px solid var(--accent); border-radius: 4px; background: var(--card-2); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.flagged td { background: rgba(242, 184, 75, 0.08); }
+.rubriek-tag { font-weight: 600; }
+.rubriek-4a { color: #f2b84b; }
+.rubriek-4b { color: #4f9cf9; }
+.rubriek-5b { color: #3ecf8e; }
+.rubriek-none { color: var(--muted); }
+
+.logic p { color: var(--muted); font-size: 13px; margin: 0; }
+code { background: var(--card-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+
+.foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 32px; }
+
+@media (max-width: 720px) {
+  .totals { grid-template-columns: repeat(2, 1fr); }
+  h1 { font-size: 26px; }
+}

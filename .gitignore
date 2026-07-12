@@ -1,0 +1,21 @@
+# Real expense exports — never commit actual financial data.
+# The tracked sample lives at src/sample.csv; ignore everything else.
+*.csv
+!src/sample.csv
+
+# Secrets / env
+.env
+.env.*
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Build / deps (in case you later add a build step)
+node_modules/
+dist/

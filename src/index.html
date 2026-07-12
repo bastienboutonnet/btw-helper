@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BTW Aangifte Helper</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <p class="eyebrow">Kwartaal · Omzetbelasting</p>
+    <h1>BTW Aangifte Helper</h1>
+    <p class="lede">
+      Drop your expense export and it derives the rubriek totals: 4a &amp; 4b for
+      reverse-charge purchases, 5b for all deductible input VAT. Classification
+      follows <strong>Expense Tax Name 1</strong>; vendor country is auto-detected
+      from the name where possible.
+    </p>
+
+    <section class="card">
+      <h2>Drop your CSV here</h2>
+      <div id="dropzone" class="dropzone" tabindex="0" role="button"
+           aria-label="Drop CSV file here or click to browse">
+        <p>or click to browse · the same export you get from your expense system</p>
+        <p class="hint">
+          Expects columns like Expense Vendor, Expense Net Amount,
+          Expense Tax Name 1, Expense Currency, Expense Converted Amount
+        </p>
+        <input type="file" id="fileInput" accept=".csv,text/csv" hidden />
+      </div>
+      <div class="controls">
+        <button id="loadSample" type="button" class="btn-secondary">Load this quarter's sample</button>
+        <label class="rate">
+          Reverse-charge VAT rate %
+          <input type="number" id="rcRate" value="21" min="0" max="100" step="0.1" />
+        </label>
+        <button id="recalc" type="button" class="btn-primary">Recalculate</button>
+      </div>
+    </section>
+
+    <section class="card note">
+      <p>
+        <strong>Remember:</strong> reverse-charge VAT (4a/4b) is also deducted as
+        voorbelasting in 5b, so it nets to &euro;0 — but both boxes must be filled.
+        This tool already includes it in the 5b total below.
+      </p>
+    </section>
+
+    <section class="totals" id="totals" aria-live="polite">
+      <div class="box"><span class="label">4a · net</span><span class="val" data-t="4a-net">&euro;0,00</span></div>
+      <div class="box"><span class="label">4a · VAT</span><span class="val" data-t="4a-vat">&euro;0,00</span></div>
+      <div class="box"><span class="label">4b · net</span><span class="val" data-t="4b-net">&euro;0,00</span></div>
+      <div class="box"><span class="label">4b · VAT</span><span class="val" data-t="4b-vat">&euro;0,00</span></div>
+      <div class="box highlight"><span class="label">5b · voorbelasting</span><span class="val" data-t="5b">&euro;0,00</span></div>
+    </section>
+
+    <section class="card">
+      <h3>Flags to review <span id="flagCount" class="count">0</span></h3>
+      <ul id="flags" class="flags"></ul>
+    </section>
+
+    <section class="card">
+      <h3>All rows · edit any cell to correct it, totals recompute live
+        <span id="rowCount" class="count">0</span></h3>
+      <div class="table-scroll">
+        <table id="rows">
+          <thead>
+            <tr>
+              <th>Date</th><th>Vendor</th><th>Tax Name 1</th><th>Country</th>
+              <th>Net</th><th>Cur</th><th>Rate</th><th>Net (&euro;)</th>
+              <th>VAT (&euro;)</th><th>Rubriek</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card logic">
+      <p>
+        Logic: classification follows <code>Expense Tax Name 1</code>. Rows named
+        <code>Reverse Charge</code> → net + computed VAT into 4a (non-EU) or 4b (EU)
+        by country, and the same VAT into 5b. Rows named <code>VAT (NL)</code> →
+        their VAT into 5b only. Vendor country is taken from your saved map, else
+        detected inside the vendor name (e.g. brackets or after a dash like
+        <code>Acme – DE</code>), else you set it in the table. Non-EUR rows use the
+        Converted Amount when present, otherwise Amount × Exchange Rate. Nothing is
+        filed automatically — this only computes the numbers you type into Mijn
+        Belastingdienst.
+      </p>
+    </section>
+
+    <footer class="foot">Self-hosted · BTW Aangifte Helper</footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
