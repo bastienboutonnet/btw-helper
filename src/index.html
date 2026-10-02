@@ -30,7 +30,7 @@
       <div class="controls">
         <button id="loadSample" type="button" class="btn-secondary">Load this quarter's sample</button>
         <label class="rate">
-          VAT rate %
+          Default VAT %
           <input type="number" id="rcRate" value="21" min="0" max="100" step="0.1" />
         </label>
         <button id="recalc" type="button" class="btn-primary">Recalculate</button>
@@ -91,7 +91,7 @@
         <table id="rows">
           <thead>
             <tr>
-              <th>Date</th><th>Vendor</th><th>Tax Name 1</th><th>Country</th>
+              <th>Date</th><th>Vendor</th><th>Tax Name 1</th><th>VAT %</th><th>Country</th>
               <th>Net</th><th>Cur</th><th>Rate</th><th>Net (&euro;)</th>
               <th>VAT (&euro;)</th><th>Rubriek</th>
             </tr>
@@ -107,9 +107,10 @@
         <li>
           The file's header row decides how it is read. <strong>Invoice Ninja</strong>:
           classification follows <code>Expense Tax Name 1</code> and VAT is computed
-          at the rate above. <strong>Bench</strong>: each bill's own VAT, its
+          at the row's <em>VAT %</em> — the default above unless the tax name implies
+          another or you type one in the table. <strong>Bench</strong>: each bill's own VAT, its
           reverse-charge tick and its supplier region are taken as they are, so the
-          rate above is not used.
+          rate above is not used; the table shows the rate each bill works out to.
         </li>
         <li>
           Every row in the file counts, so export just the quarter you are filing —
@@ -120,7 +121,10 @@
           <strong>4a</strong> (non-EU) or <strong>4b</strong> (EU) by vendor
           country; the same VAT also goes into <strong>5b</strong>.
         </li>
-        <li><code>VAT (NL)</code> → its VAT into <strong>5b</strong> only.</li>
+        <li>
+          <code>VAT (NL)</code> (default rate) and <code>Reduced VAT</code> (9%) →
+          their VAT into <strong>5b</strong> only.
+        </li>
         <li>
           Vendor country (Invoice Ninja): your saved map → detected in the vendor name
           (brackets or after a dash, e.g. <code>Acme – DE</code>) → else you set

@@ -162,3 +162,6 @@ code { background: var(--card-2); border: 1px solid var(--border); border-radius
   .totals { grid-template-columns: repeat(2, 1fr); }
   h1 { font-size: 26px; }
 }
+
+/* A VAT % that is only the form's default passing through. */
+td.inherited { color: var(--muted); }

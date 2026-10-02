@@ -26,6 +26,9 @@ The format is recognised from the header row, never guessed column by column.
 
 - `Reverse Charge` → net + VAT at the form's rate into 4a/4b by country, the same VAT into 5b
 - `VAT (NL)` → VAT at the form's rate into 5b only
+- `Reduced VAT` → VAT at 9% (laag tarief) into 5b only
+- Any row's rate can be overridden in the table's **VAT %** column (greyed while it's
+  just the form's default)
 - Vendor country: saved map (localStorage) → detected from the vendor name
   (`Acme (DE)` or `Acme – DE`) → else you set it in the table
 - Non-EUR rows use the Converted Amount when present, otherwise Amount × Exchange Rate
@@ -34,7 +37,8 @@ The format is recognised from the header row, never guessed column by column.
 columns `incurred`, `supplier`, `currency`, `net`, `vat`, `reverse_charge`,
 `supplier_region`, …):
 
-- Each bill's own `vat` is used, so a 9% bill stays 9% — the form's rate is ignored
+- Each bill's own `vat` is used, so a 9% bill stays 9% — the form's rate is ignored.
+  The **VAT %** column shows the rate it works out to; typing one there overrides it
 - `reverse_charge = yes` → 4a/4b by `supplier_region` (`outside_eu` / `eu`); a country
   picked in the table overrides it. No region → flagged
 - Any other bill with VAT → 5b
@@ -139,6 +143,6 @@ btw-helper/
 
 - Real expense exports are git-ignored so financial data never gets committed.
   Only `src/sample.csv` is tracked.
-- The reverse-charge VAT rate is adjustable in the UI (default 21%).
+- The default VAT rate is adjustable in the UI (21%); per row in the **VAT %** column.
 - Classification logic lives in `src/app.js` (`classify` and `computeTotals`) —
   that's the place to extend as your expense categories grow.

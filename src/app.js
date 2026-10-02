@@ -192,6 +192,7 @@ function buildRows(csvRows, format) {
       exchangeRate: idx.rate !== -1 ? num(cells[idx.rate]) : 0,
       region: "",
       vatRatio: null,
+      vatRate: null,
     };
   });
 }
@@ -227,6 +228,7 @@ function buildBenchRows(headers, body) {
       // are in EUR by then — so it is never read as one still to apply.
       exchangeRate: 0,
       vatRatio: net > 0 ? vat / net : 0,
+      vatRate: null,
     };
   });
 }
@@ -239,11 +241,19 @@ function netInEur(row) {
   return row.net; // fall back; will be flagged
 }
 
+// --- Tax names ---
+// Dutch input VAT comes in two names: the standard rate, worked out at the rate
+// in the form, and the reduced one (laag tarief), at 9% unless the row is
+// given a rate of its own.
+const REDUCED_RATE = 9;
+const isNlVat = tax => tax.startsWith("vat (nl") || tax.startsWith("reduced vat");
+const nameRate = tax => tax.startsWith("reduced vat") ? REDUCED_RATE : null;
+
 // --- Classify a single row ---
 function classify(row, rcRate) {
   const tax = row.tax.toLowerCase();
   const eur = netInEur(row);
-  const result = { netEur: eur, vatEur: 0, rubriek: "none", flags: [] };
+  const result = { netEur: eur, vatEur: 0, rubriek: "none", flags: [], rate: null, rateFromForm: false };
 
   if (row.currency !== "EUR" && !row.converted && !row.exchangeRate) {
     result.flags.push(row.vatRatio !== null
@@ -252,8 +262,15 @@ function classify(row, rcRate) {
   }
 
   // A Bench row brings the VAT that was on the bill; anything else is worked
-  // out at the rate in the form, as it always was.
-  const vatOf = n => row.vatRatio !== null ? Math.round(n * row.vatRatio * 100) / 100 : n * (rcRate / 100);
+  // out at the rate typed on the row, else the one its tax name implies, else
+  // the rate in the form.
+  const ownRate = row.vatRatio !== null ? row.vatRatio * 100 : row.vatRate ?? nameRate(tax);
+  const rate = ownRate ?? rcRate;
+  const vatOf = n => {
+    result.rate = rate;
+    result.rateFromForm = ownRate === null;
+    return row.vatRatio !== null ? Math.round(n * row.vatRatio * 100) / 100 : n * (rate / 100);
+  };
 
   if (tax === "reverse charge") {
     result.vatEur = vatOf(eur);
@@ -269,13 +286,13 @@ function classify(row, rcRate) {
     } else {
       result.rubriek = inEu ? "4b" : "4a";
     }
-  } else if (tax === "vat (nl)" || tax.startsWith("vat (nl")) {
+  } else if (isNlVat(tax)) {
     // NL input VAT (voorbelasting): deductible in 5b only.
     result.vatEur = vatOf(eur);
     result.rubriek = "5b";
   } else if (tax) {
     result.rubriek = "none";
-    result.flags.push(`Unrecognized Tax Name 1: "${row.tax}".`);
+    result.flags.push(`Unrecognized Tax Name 1: "${row.tax}" — use Reverse Charge, VAT (NL) or Reduced VAT.`);
   } else {
     result.rubriek = "none";
   }
@@ -306,7 +323,7 @@ let state = { rows: [], rcRate: 21, format: "" };
 
 const FORMAT_LABELS = {
   bench: "Bench export — VAT, reverse charge and supplier region read from the file",
-  ninja: "Invoice Ninja export — classified by Tax Name 1, VAT at the rate above",
+  ninja: "Invoice Ninja export — classified by Tax Name 1, VAT at each row's VAT %",
   unknown: "Columns not recognised — read as Invoice Ninja; check the rows below",
 };
 
@@ -348,6 +365,7 @@ function render() {
     tr.appendChild(td(row.date, "date"));
     tr.appendChild(td(row.vendor, "vendor"));
     tr.appendChild(td(row.tax, "tax"));
+    tr.appendChild(rateCell(row, c));
     tr.appendChild(countryCell(row));
     tr.appendChild(td(row.net, "net", true, true));
     tr.appendChild(td(row.currency, "currency"));
@@ -370,6 +388,19 @@ function td(value, field, editable = true, numeric = false) {
     cell.contentEditable = "true";
     cell.dataset.field = field;
   }
+  return cell;
+}
+
+// VAT % cell: the rate the row's VAT was worked out at. Greyed when it is only
+// the form's rate passing through, so typing one here is what pins it. The
+// shown text is kept so that tabbing through without typing changes nothing —
+// otherwise a Bench bill's exact VAT would be rounded to the displayed rate.
+function rateCell(row, c) {
+  const shown = c.rate !== null ? String(Math.round(c.rate * 100) / 100)
+    : row.vatRate !== null ? String(row.vatRate) : "";
+  const cell = td(shown, "vatRate", true, true);
+  cell.dataset.shown = shown;
+  if (c.rateFromForm) cell.classList.add("inherited");
   return cell;
 }
 
@@ -419,7 +450,15 @@ document.querySelector("#rows tbody").addEventListener("blur", (e) => {
   if (!row) return;
   const raw = cell.textContent.trim();
 
-  if (["net", "exchangeRate"].includes(field)) row[field] = num(raw);
+  if (field === "vatRate") {
+    if (raw === cell.dataset.shown) return;
+    const rate = raw === "" ? null : num(raw);
+    // A Bench row's VAT is a ratio of its net; a rate typed over it replaces
+    // that, and clearing it leaves the bill's own VAT in place.
+    if (row.vatRatio !== null) { if (rate !== null) row.vatRatio = rate / 100; }
+    else row.vatRate = rate;
+  }
+  else if (["net", "exchangeRate"].includes(field)) row[field] = num(raw);
   else row[field] = raw;
   render();
 }, true);
