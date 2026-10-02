@@ -100,6 +100,18 @@
         </span>
         <span class="val" data-t="3b-net">&euro;0,00</span>
       </div>
+      <div class="box box-3a">
+        <span class="label">3a · omzet
+          <span class="info" tabindex="0">i<span class="tip"><strong>Goods exported</strong> outside the EU (uitvoer). Services to businesses there are not on the return; pick 3a on an invoice for goods.</span></span>
+        </span>
+        <span class="val" data-t="3a-net">&euro;0,00</span>
+      </div>
+      <div class="box box-3c">
+        <span class="label">3c · omzet
+          <span class="info" tabindex="0">i<span class="tip"><strong>Installations</strong> in, or <strong>distance sales</strong> to, other EU countries where the VAT is due there (not via OSS). Picked per invoice.</span></span>
+        </span>
+        <span class="val" data-t="3c-net">&euro;0,00</span>
+      </div>
       </div>
       <h3 class="group">Purchases · reverse charge</h3>
       <div class="totals">
@@ -169,7 +181,7 @@
     </section>
 
     <section class="card" id="salesCard" hidden>
-      <h3>Invoices · untick one to leave it out, set the country of a client billed without VAT
+      <h3>Invoices · untick one to leave it out, set the country of a client billed without VAT, override a rubriek
         <span id="salesCount" class="count">0</span></h3>
       <div class="table-scroll">
         <table id="sales">
@@ -212,8 +224,11 @@
           any other <strong>1c</strong>. Billed without VAT, the client's country
           decides: the Netherlands <strong>1e</strong>, another EU country
           <strong>3b</strong>, outside the EU nowhere — a service to a business there
-          is taxed there and stays off the Dutch return. Drafts, cancelled and reversed
-          invoices start unticked. VAT is due on the invoice date, paid or not.
+          is taxed there and stays off the Dutch return. That assumes services: for
+          goods exported outside the EU pick <strong>3a</strong> on the invoice, for
+          installations or distance sales taxed in another EU country
+          <strong>3c</strong> — any rubriek picked there overrides the rules. Drafts,
+          cancelled and reversed invoices start unticked. VAT is due on the invoice date, paid or not.
         </li>
         <li>
           The file's header row decides how it is read. <strong>Invoice Ninja</strong>:

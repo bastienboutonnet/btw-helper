@@ -13,7 +13,8 @@ filed** — it only computes the numbers you then type into Mijn Belastingdienst
 ## What it does
 
 - **1a / 1b / 1c** — sales at 21%, 9%, or any other rate; **1e** — sales in NL without
-  VAT; **3b** — sales to EU businesses, reverse-charged
+  VAT; **3b** — sales to EU businesses, reverse-charged; **3a / 3c** — exports and
+  EU installations/distance sales, picked per invoice
 - **4a / 4b** — reverse-charge purchases, split by where the supplier is (4a non-EU, 4b EU)
 - **5b** — all deductible input VAT, including the reverse-charge VAT (which nets to €0
   but must appear in both boxes)
@@ -36,6 +37,9 @@ the purchases side, and each replaces only its own.
 - No VAT charged → by client country: NL → 1e, another EU country → 3b (also on your
   ICP listing), outside the EU → not on the return (a service to a business there is
   taxed there). No country known → flagged until you set it; it's remembered per client
+- Those rules assume services. Each invoice has a **Rubriek** picker: leave it on *auto*,
+  or pick **3a** for goods exported outside the EU, **3c** for installations or distance
+  sales taxed in another EU country, or any other rubriek to override the rules
 - Draft, cancelled and reversed invoices start unticked
 - Non-EUR invoices are converted with Ninja's exchange rate (shown as euros per unit)
 - VAT is due on the invoice date, paid or not — export by invoice date

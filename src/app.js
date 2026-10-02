@@ -365,6 +365,7 @@ function buildInvoiceRows(headers, body) {
       exchangeRate: currency !== "EUR" && ninjaRate ? Math.round(1e6 / ninjaRate) / 1e6 : 0,
       status,
       excluded: NOT_TURNOVER.has(status.toLowerCase()),
+      rubriekOverride: "",
     };
   });
 }
@@ -374,7 +375,27 @@ function buildInvoiceRows(headers, body) {
 // Netherlands in 1e, another EU country in 3b (reverse-charged, and on the ICP
 // listing too), outside the EU nowhere: a service to a business there is taxed
 // there and is left off the Dutch return.
+//
+// That assumes services. Goods exported outside the EU (3a), and installations
+// or distance sales taxed in another EU country (3c), can't be told apart from
+// the report, so a rubriek picked on the invoice overrides the rules.
+const SALES_RUBRIEKEN = ["1a", "1b", "1c", "1e", "3a", "3b", "3c", "out"];
+const UNTAXED = new Set(["1e", "3a", "3b", "3c", "out"]);
+
 function classifySale(row) {
+  const result = classifySaleAuto(row);
+  result.auto = result.rubriek;
+  if (!row.rubriekOverride) return result;
+  result.rubriek = row.rubriekOverride;
+  // The rules no longer decide, so a missing country no longer matters.
+  result.flags = result.flags.filter(f => !f.startsWith("No VAT charged"));
+  if (UNTAXED.has(row.rubriekOverride) && Math.abs(row.vat) >= 0.005) {
+    result.flags.push(`Charged VAT, but ${RUBRIEK_TEXT[row.rubriekOverride] || row.rubriekOverride} turnover carries none — check the invoice or the rubriek.`);
+  }
+  return result;
+}
+
+function classifySaleAuto(row) {
   const toEur = n => row.currency === "EUR" || !row.currency ? n
     : row.exchangeRate ? Math.round(n * row.exchangeRate * 100) / 100 : n;
   const result = { netEur: toEur(row.net), vatEur: toEur(row.vat), rubriek: "none", flags: [], rate: null };
@@ -387,7 +408,7 @@ function classifySale(row) {
     result.rubriek = Math.abs(rate - 21) < 0.5 ? "1a" : Math.abs(rate - REDUCED_RATE) < 0.5 ? "1b" : "1c";
   } else if (!row.country) {
     result.rate = 0;
-    result.flags.push("No VAT charged and no client country — set it: NL goes in 1e, the EU in 3b, outside the EU off the return.");
+    result.flags.push("No VAT charged and no client country — set it: NL goes in 1e, the EU in 3b, outside the EU off the return (or pick 3a for exported goods).");
   } else {
     result.rate = 0;
     result.rubriek = row.country === "NL" ? "1e" : EU_COUNTRIES.has(row.country) ? "3b" : "out";
@@ -396,7 +417,8 @@ function classifySale(row) {
 }
 
 function computeSalesTotals(rows) {
-  const t = { "1a-net": 0, "1a-vat": 0, "1b-net": 0, "1b-vat": 0, "1c-net": 0, "1c-vat": 0, "1e-net": 0, "3b-net": 0 };
+  const t = { "1a-net": 0, "1a-vat": 0, "1b-net": 0, "1b-vat": 0, "1c-net": 0, "1c-vat": 0, "1e-net": 0,
+    "3a-net": 0, "3b-net": 0, "3c-net": 0 };
   const classified = rows.map((r, i) => ({ row: r, c: classifySale(r), i }));
   for (const { row, c } of classified) {
     if (row.excluded || !(`${c.rubriek}-net` in t)) continue;
@@ -444,9 +466,10 @@ function render() {
     if (el) el.textContent = euro(key === "5c" ? Math.abs(val) : val);
   }
   document.getElementById("result-label").textContent = all["5c"] < 0 ? "5c · to reclaim" : "5c · to pay";
-  // 1c and 2a are rare; their boxes show only when something lands there.
-  document.querySelectorAll(".box-1c").forEach(b => { b.hidden = !all["1c-net"]; });
-  document.querySelectorAll(".box-2a").forEach(b => { b.hidden = !all["2a-net"]; });
+  // 1c, 2a, 3a and 3c are rare; their boxes show only when something lands there.
+  for (const r of ["1c", "2a", "3a", "3c"]) {
+    document.querySelectorAll(`.box-${r}`).forEach(b => { b.hidden = !all[`${r}-net`]; });
+  }
 
   const flags = [];
   // An excluded row has nothing left to review.
@@ -517,7 +540,7 @@ function renderSales(classified) {
     tr.appendChild(td(c.rate === null ? "" : String(Math.round(c.rate * 100) / 100), null, false, true));
     tr.appendChild(td(euro(c.netEur), null, false, true));
     tr.appendChild(td(euro(c.vatEur), null, false, true));
-    tr.appendChild(rubriekCell(row, c));
+    tr.appendChild(salesRubriekCell(row, c));
     tbody.appendChild(tr);
   });
   document.getElementById("salesCount").textContent = countText(state.sales);
@@ -530,6 +553,28 @@ function rubriekCell(row, c) {
   tag.className = `rubriek-tag rubriek-${row.excluded || c.rubriek === "out" ? "none" : c.rubriek}`;
   tag.textContent = RUBRIEK_TEXT[rubriek] || rubriek;
   cell.appendChild(tag);
+  return cell;
+}
+
+// An invoice's rubriek is a picker: "auto" follows the rules (and says where
+// they put it), anything else overrides them.
+function salesRubriekCell(row, c) {
+  if (row.excluded) return rubriekCell(row, c);
+  const cell = document.createElement("td");
+  const select = document.createElement("select");
+  select.className = `rubriek-select rubriek-tag rubriek-${c.rubriek === "out" ? "none" : c.rubriek}`;
+  select.dataset.field = "rubriek";
+  select.setAttribute("aria-label", `Rubriek for invoice ${row.number}`);
+  const label = r => RUBRIEK_TEXT[r] || r;
+  const options = [["", `auto · ${label(c.auto)}`], ...SALES_RUBRIEKEN.map(r => [r, label(r)])];
+  for (const [value, text] of options) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = text;
+    select.appendChild(opt);
+  }
+  select.value = row.rubriekOverride;
+  cell.appendChild(select);
   return cell;
 }
 
@@ -655,6 +700,12 @@ onRows("keydown", (e) => {
 // Resolve the typed/picked text to a canonical code, then persist to the
 // vendor->country map so the same vendor auto-fills next time.
 onRows("change", (e) => {
+  const picker = e.target.closest("select[data-field='rubriek']");
+  if (picker) {
+    const row = rowOf(picker);
+    if (row) { row.rubriekOverride = picker.value; render(); }
+    return;
+  }
   const box = e.target.closest("input[data-field='excluded']");
   if (box) {
     const row = rowOf(box);
