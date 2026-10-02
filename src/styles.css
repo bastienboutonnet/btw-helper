@@ -165,3 +165,7 @@ code { background: var(--card-2); border: 1px solid var(--border); border-radius
 
 /* A VAT % that is only the form's default passing through. */
 td.inherited { color: var(--muted); }
+
+/* A row unticked from Count: kept in view, out of the totals. */
+tr.excluded td { opacity: 0.45; }
+tr.excluded td:first-child { opacity: 1; }

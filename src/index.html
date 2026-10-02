@@ -85,13 +85,13 @@
     </section>
 
     <section class="card">
-      <h3>All rows · edit any cell to correct it, totals recompute live
+      <h3>All rows · edit any cell to correct it, untick one to leave it out; totals recompute live
         <span id="rowCount" class="count">0</span></h3>
       <div class="table-scroll">
         <table id="rows">
           <thead>
             <tr>
-              <th>Date</th><th>Vendor</th><th>Tax Name 1</th><th>VAT %</th><th>Country</th>
+              <th>Count</th><th>Date</th><th>Vendor</th><th>Tax Name 1</th><th>VAT %</th><th>Country</th>
               <th>Net</th><th>Cur</th><th>Rate</th><th>Net (&euro;)</th>
               <th>VAT (&euro;)</th><th>Rubriek</th>
             </tr>
@@ -114,7 +114,9 @@
         </li>
         <li>
           Every row in the file counts, so export just the quarter you are filing —
-          in Bench, pick the quarter beside the spreadsheet download.
+          in Bench, pick the quarter beside the spreadsheet download. Untick
+          <em>Count</em> on a row that shouldn't be in this return; it stays in the
+          table, greyed, but out of every total and the flags.
         </li>
         <li>
           <code>Reverse Charge</code> → net + computed VAT into

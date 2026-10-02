@@ -193,6 +193,7 @@ function buildRows(csvRows, format) {
       region: "",
       vatRatio: null,
       vatRate: null,
+      excluded: false,
     };
   });
 }
@@ -229,6 +230,7 @@ function buildBenchRows(headers, body) {
       exchangeRate: 0,
       vatRatio: net > 0 ? vat / net : 0,
       vatRate: null,
+      excluded: false,
     };
   });
 }
@@ -300,13 +302,14 @@ function classify(row, rcRate) {
 }
 
 // --- Compute all totals ---
-// Every row in the file counts. Choosing the period is the export's job — Bench
-// and Invoice Ninja can both export a quarter — so this page adds up exactly
-// what it was given.
+// Every row in the file counts unless it is unticked in the table. Choosing the
+// period is the export's job — Bench and Invoice Ninja can both export a
+// quarter — so this page adds up what it was given, less what was set aside.
 function computeTotals(rows, rcRate) {
   const t = { "4a-net": 0, "4a-vat": 0, "4b-net": 0, "4b-vat": 0, "5b": 0 };
   const classified = rows.map((r, i) => ({ row: r, c: classify(r, rcRate), i }));
-  for (const { c } of classified) {
+  for (const { row, c } of classified) {
+    if (row.excluded) continue;
     if (c.rubriek === "4a") { t["4a-net"] += c.netEur; t["4a-vat"] += c.vatEur; t["5b"] += c.vatEur; }
     else if (c.rubriek === "4b") { t["4b-net"] += c.netEur; t["4b-vat"] += c.vatEur; t["5b"] += c.vatEur; }
     else if (c.rubriek === "5b") { t["5b"] += c.vatEur; }
@@ -342,7 +345,9 @@ function render() {
   }
 
   const flags = [];
+  // An excluded row has nothing left to review.
   classified.forEach(({ row, c, i }) => {
+    if (row.excluded) return;
     c.flags.forEach(f => flags.push({ i, vendor: row.vendor, msg: f }));
   });
 
@@ -361,7 +366,9 @@ function render() {
   classified.forEach(({ row, c, i }) => {
     const tr = document.createElement("tr");
     if (flaggedRowIdx.has(i)) tr.classList.add("flagged");
+    if (row.excluded) tr.classList.add("excluded");
     tr.dataset.i = i;
+    tr.appendChild(countCell(row));
     tr.appendChild(td(row.date, "date"));
     tr.appendChild(td(row.vendor, "vendor"));
     tr.appendChild(td(row.tax, "tax"));
@@ -373,11 +380,14 @@ function render() {
     tr.appendChild(td(euro(c.netEur), null, false, true));
     tr.appendChild(td(euro(c.vatEur), null, false, true));
     const rub = document.createElement("td");
-    rub.innerHTML = `<span class="rubriek-tag rubriek-${c.rubriek}">${c.rubriek === "none" ? "—" : c.rubriek}</span>`;
+    rub.innerHTML = row.excluded ? `<span class="rubriek-tag rubriek-none">excluded</span>`
+      : `<span class="rubriek-tag rubriek-${c.rubriek}">${c.rubriek === "none" ? "—" : c.rubriek}</span>`;
     tr.appendChild(rub);
     tbody.appendChild(tr);
   });
-  document.getElementById("rowCount").textContent = state.rows.length;
+  const excluded = state.rows.filter(r => r.excluded).length;
+  document.getElementById("rowCount").textContent = excluded
+    ? `${state.rows.length - excluded} of ${state.rows.length}` : state.rows.length;
 }
 
 function td(value, field, editable = true, numeric = false) {
@@ -388,6 +398,20 @@ function td(value, field, editable = true, numeric = false) {
     cell.contentEditable = "true";
     cell.dataset.field = field;
   }
+  return cell;
+}
+
+// Count cell: a tick that, cleared, leaves the row in the table but out of
+// every total — for an expense that made it into the export but isn't part of
+// this return.
+function countCell(row) {
+  const cell = document.createElement("td");
+  const box = document.createElement("input");
+  box.type = "checkbox";
+  box.checked = !row.excluded;
+  box.dataset.field = "excluded";
+  box.setAttribute("aria-label", `Count ${row.vendor || "this row"} in the totals`);
+  cell.appendChild(box);
   return cell;
 }
 
@@ -467,6 +491,12 @@ document.querySelector("#rows tbody").addEventListener("blur", (e) => {
 // Resolve the typed/picked text to a canonical code, then persist to the
 // vendor->country map so the same vendor auto-fills next time.
 document.querySelector("#rows tbody").addEventListener("change", (e) => {
+  const box = e.target.closest("input[data-field='excluded']");
+  if (box) {
+    const row = state.rows[Number(box.closest("tr").dataset.i)];
+    if (row) { row.excluded = !box.checked; render(); }
+    return;
+  }
   const input = e.target.closest("input[data-field='country']");
   if (!input) return;
   const tr = input.closest("tr");

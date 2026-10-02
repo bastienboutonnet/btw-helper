@@ -13,7 +13,8 @@ filed** — it only computes the numbers you then type into Mijn Belastingdienst
 - **4a / 4b** — reverse-charge purchases, split by where the supplier is (4a non-EU, 4b EU)
 - **5b** — all deductible input VAT, including the reverse-charge VAT (which nets to €0
   but must appear in both boxes)
-- Every row in the file counts — export just the quarter you're filing
+- Every row in the file counts — export just the quarter you're filing — unless you
+  untick its **Count** box in the table, which keeps it visible but out of every total
 - Editable table with live-recomputing totals and a flags-to-review list
 
 ## Input formats
