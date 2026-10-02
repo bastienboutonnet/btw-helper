@@ -1,7 +1,8 @@
 # BTW Aangifte Helper
 
 A single-page tool for preparing your quarterly Dutch VAT return (omzetbelasting).
-Drop your **Invoice Ninja invoice report** and an expense CSV export — from **Invoice
+Drop your invoices — **Invoice Ninja's invoice report** or **Bench's invoice export** —
+and an expense CSV export — from **Invoice
 Ninja** or from **Bench** — and it derives the rubriek totals: **1a–1e** and **3b** for
 what you billed, **4a** and **4b** for reverse-charge purchases, **5b** for all
 deductible input VAT (voorbelasting), and **5a / 5c** — what you owe and what's left
@@ -43,6 +44,18 @@ the purchases side, and each replaces only its own.
 - Draft, cancelled and reversed invoices start unticked
 - Non-EUR invoices are converted with Ninja's exchange rate (shown as euros per unit)
 - VAT is due on the invoice date, paid or not — export by invoice date
+
+**Bench invoices** (the books → Invoices → *Spreadsheet of invoices dated* → the
+quarter; columns `issued`, `number`, `client`, `currency`, `net`, `vat`, `gross`,
+`vat_rate`, `void`):
+
+- Classified exactly like Invoice Ninja's: each invoice's own VAT, rubriek by the rate
+  it works out to, or by client country when it charged none
+- Bench has no client country, so an invoice without VAT is flagged until you set one
+  here (remembered per client); one in another currency waits for a rate
+- Voided invoices start unticked
+- Bench's *payments* export is money received, by payment date — the wrong cut for a
+  return filed on invoices, so the helper says so instead of reading it
 
 **Invoice Ninja** (`Expense Vendor`, `Expense Net Amount`, `Expense Tax Name 1`,
 `Expense Currency`, `Expense Converted Amount`, optionally `Expense Exchange Rate`,

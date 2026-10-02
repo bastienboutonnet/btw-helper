@@ -24,7 +24,8 @@
            aria-label="Drop CSV file here or click to browse">
         <p>or click to browse · one file or both at once</p>
         <p class="hint">
-          Invoices: Invoice Ninja's invoice report for the quarter. Expenses: Invoice
+          Invoices: Invoice Ninja's invoice report, or Bench's (the books → Invoices →
+          spreadsheet of invoices dated in the quarter). Expenses: Invoice
           Ninja's expense export, or Bench's (the books → What went out → spreadsheet
           of bills dated in the quarter you're filing)
         </p>
@@ -218,8 +219,8 @@
       <h3>How it works</h3>
       <ul class="logic-list">
         <li>
-          <strong>Invoices</strong> (Invoice Ninja's invoice report): each invoice's
-          own VAT is used, and the net is its amount less that VAT. The rate it works
+          <strong>Invoices</strong> (Invoice Ninja's invoice report, or Bench's
+          invoice export): each invoice's own VAT is used, and the net is its amount less that VAT. The rate it works
           out to picks the rubriek — 21% <strong>1a</strong>, 9% <strong>1b</strong>,
           any other <strong>1c</strong>. Billed without VAT, the client's country
           decides: the Netherlands <strong>1e</strong>, another EU country
@@ -228,7 +229,7 @@
           goods exported outside the EU pick <strong>3a</strong> on the invoice, for
           installations or distance sales taxed in another EU country
           <strong>3c</strong> — any rubriek picked there overrides the rules. Drafts,
-          cancelled and reversed invoices start unticked. VAT is due on the invoice date, paid or not.
+          cancelled, reversed and voided invoices start unticked. VAT is due on the invoice date, paid or not.
         </li>
         <li>
           The file's header row decides how it is read. <strong>Invoice Ninja</strong>:

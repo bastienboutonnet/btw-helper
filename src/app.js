@@ -111,12 +111,20 @@ function parseCSV(text) {
 //
 // and one for the other side of the return:
 //
-//   invoices: Invoice Ninja's invoice report — what was billed, with the VAT
-//             each invoice charged. Its rows are sales, kept apart from the
-//             expenses, so dropping one file never replaces the other kind.
+//   invoices:       Invoice Ninja's invoice report — what was billed, with the
+//                   VAT each invoice charged.
+//   bench-invoices: Bench's invoice export (books → Invoices → spreadsheet),
+//                   the same facts in Bench's columns.
+//
+// Their rows are sales, kept apart from the expenses, so dropping one file
+// never replaces the other kind.
+const SALES_FORMATS = new Set(["invoices", "bench-invoices"]);
+
 function detectFormat(headers) {
   const set = new Set(headers.map(h => h.trim().toLowerCase()));
   if (set.has("invoice invoice number") || (set.has("invoice amount") && set.has("invoice tax amount"))) return "invoices";
+  if (["issued", "number", "client", "net", "vat", "vat_rate"].every(h => set.has(h))) return "bench-invoices";
+  if (["date", "client", "work", "kind", "gross", "net", "vat"].every(h => set.has(h))) return "bench-payments";
   if (["incurred", "supplier", "net", "vat", "reverse_charge"].every(h => set.has(h))) return "bench";
   if (set.has("expense net amount") || set.has("expense tax name 1")) return "ninja";
   return "unknown";
@@ -370,6 +378,33 @@ function buildInvoiceRows(headers, body) {
   });
 }
 
+// Bench's invoices are its own snapshots: net and VAT as printed, a void column
+// in place of a status. Bench has no client country, so an invoice without VAT
+// waits for one here, like Invoice Ninja's; one in another currency waits for
+// a rate. A formula character Bench defused is undone, as for its bills.
+function buildBenchInvoiceRows(headers, body) {
+  const col = name => headers.findIndex(h => h.trim().toLowerCase() === name);
+  const at = (cells, name) => { const i = col(name); return i === -1 ? "" : (cells[i] || "").trim(); };
+  const text = v => v.replace(/^'(?=[=+\-@])/, "");
+  return body.map(cells => {
+    const client = text(at(cells, "client"));
+    const voided = at(cells, "void").toLowerCase() === "yes";
+    return {
+      date: at(cells, "issued"),
+      number: at(cells, "number"),
+      vendor: client,
+      country: vendorMap[client.toLowerCase()] || "",
+      currency: (at(cells, "currency") || "EUR").toUpperCase(),
+      net: num(at(cells, "net")),
+      vat: num(at(cells, "vat")),
+      exchangeRate: 0,
+      status: voided ? "Void" : "Issued",
+      excluded: voided,
+      rubriekOverride: "",
+    };
+  });
+}
+
 // Which rubriek a sale belongs in. Taxed: by the rate it works out to — 21% in
 // 1a, 9% in 1b, anything else in 1c. Untaxed: by where the client is — the
 // Netherlands in 1e, another EU country in 3b (reverse-charged, and on the ICP
@@ -433,14 +468,17 @@ const fmt = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" 
 function euro(n) { return fmt.format(n || 0); }
 
 // --- State + render ---
-let state = { rows: [], rcRate: 21, format: "", sales: [] };
+let state = { rows: [], rcRate: 21, format: "", sales: [], salesFormat: "", notice: "" };
 
 const FORMAT_LABELS = {
   bench: "Bench export — VAT, reverse charge and supplier region read from the file",
   ninja: "Invoice Ninja export — classified by Tax Name 1, VAT at each row's VAT %",
   unknown: "Columns not recognised — read as Invoice Ninja; check the rows below",
 };
-const SALES_LABEL = "Invoice Ninja invoice report — each invoice's own VAT, rubriek by its rate or the client's country";
+const SALES_LABELS = {
+  invoices: "Invoice Ninja invoice report — each invoice's own VAT, rubriek by its rate or the client's country",
+  "bench-invoices": "Bench invoice export — each invoice's own VAT, rubriek by its rate or the client's country; voided ones unticked",
+};
 const RUBRIEK_TEXT = { none: "—", out: "not on return" };
 
 function render() {
@@ -451,8 +489,9 @@ function render() {
   const formatEl = document.getElementById("format");
   formatEl.textContent = [
     state.format && `Expenses read as: ${FORMAT_LABELS[state.format]}`,
-    state.sales.length && `Invoices read as: ${SALES_LABEL}`,
+    state.sales.length && `Invoices read as: ${SALES_LABELS[state.salesFormat]}`,
   ].filter(Boolean).join(" · ");
+  if (state.notice) formatEl.textContent = state.notice + (formatEl.textContent ? ` · ${formatEl.textContent}` : "");
   // The rate in the form only applies where the file doesn't bring its own.
   document.getElementById("rcRate").disabled = state.format === "bench";
 
@@ -728,8 +767,18 @@ onRows("change", (e) => {
 function ingest(text) {
   const csv = parseCSV(text);
   const format = csv.length ? detectFormat(csv[0]) : "";
-  if (format === "invoices") {
-    state.sales = buildInvoiceRows(csv[0], csv.slice(1));
+  state.notice = "";
+  // Bench's payments export is money received, by the day it arrived — the
+  // wrong cut for a return filed on invoices, so it is turned away rather than
+  // read as something it isn't.
+  if (format === "bench-payments") {
+    state.notice = "That's Bench's payments export — money received, by payment date. For the return, download the invoices spreadsheet under Invoices on Bench's books screen.";
+    render();
+    return;
+  }
+  if (SALES_FORMATS.has(format)) {
+    state.salesFormat = format;
+    state.sales = format === "invoices" ? buildInvoiceRows(csv[0], csv.slice(1)) : buildBenchInvoiceRows(csv[0], csv.slice(1));
   } else {
     state.format = format;
     state.rows = buildRows(csv, format);
