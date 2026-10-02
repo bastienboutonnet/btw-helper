@@ -1,28 +1,49 @@
 # BTW Aangifte Helper
 
 A single-page tool for preparing your quarterly Dutch VAT return (omzetbelasting).
-Drop an expense CSV export and it derives the rubriek totals — **4a** and **4b**
-for reverse-charge purchases, **5b** for all deductible input VAT (voorbelasting).
+Drop an expense CSV export — from **Invoice Ninja** or from **Bench** — and it derives
+the rubriek totals: **4a** and **4b** for reverse-charge purchases, **5b** for all
+deductible input VAT (voorbelasting).
 
 Everything runs client-side in the browser. **Nothing is uploaded and nothing is
 filed** — it only computes the numbers you then type into Mijn Belastingdienst.
 
 ## What it does
 
-- **4a / 4b** — reverse-charge purchases, split by vendor country (4a non-EU, 4b EU)
+- **4a / 4b** — reverse-charge purchases, split by where the supplier is (4a non-EU, 4b EU)
 - **5b** — all deductible input VAT, including the reverse-charge VAT (which nets to €0
   but must appear in both boxes)
-- Classification follows the **Expense Tax Name 1** column:
-  - `Reverse Charge` → net + computed VAT into 4a/4b by country, and the same VAT into 5b
-  - `VAT (NL)` → its VAT into 5b only
+- Every row in the file counts — export just the quarter you're filing
+- Editable table with live-recomputing totals and a flags-to-review list
+
+## Input formats
+
+The format is recognised from the header row, never guessed column by column.
+
+**Invoice Ninja** (`Expense Vendor`, `Expense Net Amount`, `Expense Tax Name 1`,
+`Expense Currency`, `Expense Converted Amount`, optionally `Expense Exchange Rate`,
+`Expense Date`):
+
+- `Reverse Charge` → net + VAT at the form's rate into 4a/4b by country, the same VAT into 5b
+- `VAT (NL)` → VAT at the form's rate into 5b only
 - Vendor country: saved map (localStorage) → detected from the vendor name
   (`Acme (DE)` or `Acme – DE`) → else you set it in the table
 - Non-EUR rows use the Converted Amount when present, otherwise Amount × Exchange Rate
-- Editable table with live-recomputing totals and a flags-to-review list
 
-Expected columns: `Expense Vendor`, `Expense Net Amount`, `Expense Tax Name 1`,
-`Expense Currency`, `Expense Converted Amount` (and optionally `Expense Exchange Rate`,
-`Expense Date`).
+**Bench** (the books → What went out → *Spreadsheet of bills dated* → the quarter;
+columns `incurred`, `supplier`, `currency`, `net`, `vat`, `reverse_charge`,
+`supplier_region`, …):
+
+- Each bill's own `vat` is used, so a 9% bill stays 9% — the form's rate is ignored
+- `reverse_charge = yes` → 4a/4b by `supplier_region` (`outside_eu` / `eu`); a country
+  picked in the table overrides it. No region → flagged
+- Any other bill with VAT → 5b
+- Bench cuts the export by the date on the bill, which is what a return is cut by
+- A bill given a rate in Bench arrives in EUR already. One without stays in its own
+  currency and is flagged until you type a rate in the table
+
+Bench counts any VAT on a bill as reclaimable. A bill carrying foreign VAT (a German
+hotel, say) isn't reclaimable on a Dutch return — log it in Bench at 0%.
 
 ## Run locally (no build step)
 

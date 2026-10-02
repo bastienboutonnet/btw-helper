@@ -99,6 +99,22 @@ function parseCSV(text) {
   return rows.filter(r => r.some(cell => cell.trim() !== ""));
 }
 
+// Two input formats, told apart by their header row rather than guessed column
+// by column — a loose match is how a Bench file's "rate" column once passed for
+// an exchange rate.
+//
+//   ninja: Invoice Ninja's expense export. Classification follows Tax Name 1,
+//          the VAT is computed at the rate in the form, the country is guessed.
+//   bench: Bench's expense export (books → What went out → spreadsheet). It
+//          already knows each bill's VAT, whether the charge reversed and where
+//          the supplier is, so those are read rather than worked out.
+function detectFormat(headers) {
+  const set = new Set(headers.map(h => h.trim().toLowerCase()));
+  if (["incurred", "supplier", "net", "vat", "reverse_charge"].every(h => set.has(h))) return "bench";
+  if (set.has("expense net amount") || set.has("expense tax name 1")) return "ninja";
+  return "unknown";
+}
+
 function headerIndex(headers) {
   const norm = h => h.trim().toLowerCase();
   const find = (...names) => {
@@ -133,17 +149,34 @@ function isCountryCode(code) {
   return /^[A-Za-z]{2}$/.test(code) && COUNTRY_CODE_SET.has(code.toUpperCase());
 }
 
+// A typed or exported number, whichever way it was written. The separator that
+// comes last is the decimal one when both appear ("1.234,56", "1,234.56"). With
+// only one kind: several of them are thousands ("1.234.567"), and a single one
+// is a decimal point — a lone dot always, a lone comma always. The old rule
+// read a dot before exactly three digits as thousands, which turned an
+// exchange rate of 0.921 into 921.
 function num(v) {
   if (v == null) return 0;
-  const s = String(v).replace(/[^\d,.\-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");
+  let s = String(v).replace(/[^\d,.\-]/g, "");
+  const lastDot = s.lastIndexOf("."), lastComma = s.lastIndexOf(",");
+  if (lastDot !== -1 && lastComma !== -1) {
+    const dec = lastDot > lastComma ? "." : ",";
+    const thou = dec === "." ? "," : ".";
+    s = s.split(thou).join("").replace(dec, ".");
+  } else if (lastComma !== -1) {
+    s = (s.match(/,/g).length > 1) ? s.split(",").join("") : s.replace(",", ".");
+  } else if (lastDot !== -1 && s.match(/\./g).length > 1) {
+    s = s.split(".").join("");
+  }
   const n = parseFloat(s);
   return isNaN(n) ? 0 : n;
 }
 
 // --- Build internal row model from parsed CSV ---
-function buildRows(csvRows) {
+function buildRows(csvRows, format) {
   if (!csvRows.length) return [];
   const headers = csvRows[0];
+  if (format === "bench") return buildBenchRows(headers, csvRows.slice(1));
   const idx = headerIndex(headers);
   return csvRows.slice(1).map(cells => {
     const vendor = cells[idx.vendor] || "";
@@ -157,6 +190,43 @@ function buildRows(csvRows) {
       currency: (cells[idx.currency] || "EUR").trim().toUpperCase(),
       converted: idx.converted !== -1 ? num(cells[idx.converted]) : 0,
       exchangeRate: idx.rate !== -1 ? num(cells[idx.rate]) : 0,
+      region: "",
+      vatRatio: null,
+    };
+  });
+}
+
+// Bench rows carry their own answers. `vat` is the tax actually on the bill,
+// kept as a ratio of the net so that it follows the net if a cell is corrected
+// here — and so a 9% bill is never re-taxed at the rate in the form. A bill
+// Bench converted is already in EUR, with what it originally said in the last
+// columns; one it couldn't convert stays in its own currency and is flagged.
+// Bench defuses a leading formula character with an apostrophe; it is undone
+// here because nothing in this page evaluates a cell.
+function buildBenchRows(headers, body) {
+  const col = name => headers.findIndex(h => h.trim().toLowerCase() === name);
+  const at = (cells, name) => { const i = col(name); return i === -1 ? "" : (cells[i] || "").trim(); };
+  const text = v => v.replace(/^'(?=[=+\-@])/, "");
+  return body.map(cells => {
+    const net = num(at(cells, "net"));
+    const vat = num(at(cells, "vat"));
+    const reverse = at(cells, "reverse_charge").toLowerCase() === "yes";
+    const region = at(cells, "supplier_region");
+    return {
+      date: at(cells, "incurred"),
+      vendor: text(at(cells, "supplier")) || text(at(cells, "what")),
+      // Bench has no tax name; these are the two this page understands, so the
+      // rest of it — and a hand correction in the table — works unchanged.
+      tax: reverse ? "Reverse Charge" : vat > 0 ? "VAT (NL)" : "",
+      country: "",
+      region: region === "eu" || region === "outside_eu" ? region : "",
+      net,
+      currency: (at(cells, "currency") || "EUR").toUpperCase(),
+      converted: 0,
+      // Bench's own `rate` column is the rate it already applied — the amounts
+      // are in EUR by then — so it is never read as one still to apply.
+      exchangeRate: 0,
+      vatRatio: net > 0 ? vat / net : 0,
     };
   });
 }
@@ -176,22 +246,32 @@ function classify(row, rcRate) {
   const result = { netEur: eur, vatEur: 0, rubriek: "none", flags: [] };
 
   if (row.currency !== "EUR" && !row.converted && !row.exchangeRate) {
-    result.flags.push("No converted amount or exchange rate for non-EUR row.");
+    result.flags.push(row.vatRatio !== null
+      ? `Not converted in Bench (${row.currency}) — give it a rate there, or type one in the Rate column.`
+      : "No converted amount or exchange rate for non-EUR row.");
   }
 
+  // A Bench row brings the VAT that was on the bill; anything else is worked
+  // out at the rate in the form, as it always was.
+  const vatOf = n => row.vatRatio !== null ? Math.round(n * row.vatRatio * 100) / 100 : n * (rcRate / 100);
+
   if (tax === "reverse charge") {
-    result.vatEur = eur * (rcRate / 100);
-    if (!row.country) {
+    result.vatEur = vatOf(eur);
+    // A country picked here wins; otherwise the region Bench was told.
+    const inEu = row.country ? EU_COUNTRIES.has(row.country)
+      : row.region ? row.region === "eu"
+      : null;
+    if (inEu === null) {
       result.rubriek = "none";
-      result.flags.push("Reverse charge with no country — set 4a (non-EU) or 4b (EU).");
-    } else if (EU_COUNTRIES.has(row.country)) {
-      result.rubriek = "4b";
+      result.flags.push(row.vatRatio !== null
+        ? "Reverse charge, but Bench doesn't say where the supplier is — set the country here, or the supplier in Bench."
+        : "Reverse charge with no country — set 4a (non-EU) or 4b (EU).");
     } else {
-      result.rubriek = "4a";
+      result.rubriek = inEu ? "4b" : "4a";
     }
   } else if (tax === "vat (nl)" || tax.startsWith("vat (nl")) {
-    // NL input VAT (voorbelasting): derived from net, deductible in 5b only.
-    result.vatEur = eur * (rcRate / 100);
+    // NL input VAT (voorbelasting): deductible in 5b only.
+    result.vatEur = vatOf(eur);
     result.rubriek = "5b";
   } else if (tax) {
     result.rubriek = "none";
@@ -203,9 +283,12 @@ function classify(row, rcRate) {
 }
 
 // --- Compute all totals ---
+// Every row in the file counts. Choosing the period is the export's job — Bench
+// and Invoice Ninja can both export a quarter — so this page adds up exactly
+// what it was given.
 function computeTotals(rows, rcRate) {
   const t = { "4a-net": 0, "4a-vat": 0, "4b-net": 0, "4b-vat": 0, "5b": 0 };
-  const classified = rows.map(r => ({ row: r, c: classify(r, rcRate) }));
+  const classified = rows.map((r, i) => ({ row: r, c: classify(r, rcRate), i }));
   for (const { c } of classified) {
     if (c.rubriek === "4a") { t["4a-net"] += c.netEur; t["4a-vat"] += c.vatEur; t["5b"] += c.vatEur; }
     else if (c.rubriek === "4b") { t["4b-net"] += c.netEur; t["4b-vat"] += c.vatEur; t["5b"] += c.vatEur; }
@@ -219,11 +302,22 @@ const fmt = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" 
 function euro(n) { return fmt.format(n || 0); }
 
 // --- State + render ---
-let state = { rows: [], rcRate: 21 };
+let state = { rows: [], rcRate: 21, format: "" };
+
+const FORMAT_LABELS = {
+  bench: "Bench export — VAT, reverse charge and supplier region read from the file",
+  ninja: "Invoice Ninja export — classified by Tax Name 1, VAT at the rate above",
+  unknown: "Columns not recognised — read as Invoice Ninja; check the rows below",
+};
 
 function render() {
   ensureCountryDatalist();
   const { totals, classified } = computeTotals(state.rows, state.rcRate);
+
+  const formatEl = document.getElementById("format");
+  formatEl.textContent = state.format ? `Read as: ${FORMAT_LABELS[state.format]}` : "";
+  // The rate in the form only applies where the file doesn't bring its own.
+  document.getElementById("rcRate").disabled = state.format === "bench";
 
   for (const [key, val] of Object.entries(totals)) {
     const el = document.querySelector(`[data-t="${key}"]`);
@@ -231,7 +325,7 @@ function render() {
   }
 
   const flags = [];
-  classified.forEach(({ row, c }, i) => {
+  classified.forEach(({ row, c, i }) => {
     c.flags.forEach(f => flags.push({ i, vendor: row.vendor, msg: f }));
   });
 
@@ -247,7 +341,7 @@ function render() {
   const tbody = document.querySelector("#rows tbody");
   tbody.innerHTML = "";
   const flaggedRowIdx = new Set(flags.map(f => f.i));
-  classified.forEach(({ row, c }, i) => {
+  classified.forEach(({ row, c, i }) => {
     const tr = document.createElement("tr");
     if (flaggedRowIdx.has(i)) tr.classList.add("flagged");
     tr.dataset.i = i;
@@ -304,7 +398,11 @@ function countryCell(row) {
   input.setAttribute("list", COUNTRY_LIST_ID);
   input.className = "country-input";
   input.dataset.field = "country";
-  input.placeholder = "search…";
+  // A Bench row may already know which side of the EU border its supplier is
+  // on without naming a country; say so rather than show an empty box.
+  input.placeholder = row.region === "eu" ? "EU · Bench"
+    : row.region === "outside_eu" ? "non-EU · Bench"
+    : "search…";
   input.value = COUNTRY_CODE_SET.has(row.country) ? countryLabel(row.country) : (row.country || "");
   cell.appendChild(input);
   return cell;
@@ -343,7 +441,9 @@ document.querySelector("#rows tbody").addEventListener("change", (e) => {
 
 // --- File loading ---
 function ingest(text) {
-  state.rows = buildRows(parseCSV(text));
+  const csv = parseCSV(text);
+  state.format = csv.length ? detectFormat(csv[0]) : "";
+  state.rows = buildRows(csv, state.format);
   render();
 }
 
