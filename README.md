@@ -27,9 +27,11 @@ The format is recognised from the header row, never guessed column by column.
 
 - `Reverse Charge` → net + VAT at the form's rate into 4a/4b by country, the same VAT into 5b
 - `VAT (NL)` → VAT at the form's rate into 5b only
-- `Reduced VAT` → VAT at 9% (laag tarief) into 5b only
+- `Reduced VAT`, `Reduced Rate VAT` — any name containing *reduced*, *laag* or
+  *verlaagd* → VAT at 9% (laag tarief) into 5b only
 - Any row's rate can be overridden in the table's **VAT %** column (greyed while it's
-  just the form's default)
+  just the form's default). Typing a rate on a row with an unrecognised or empty tax
+  name counts it as Dutch VAT in 5b
 - Vendor country: saved map (localStorage) → detected from the vendor name
   (`Acme (DE)` or `Acme – DE`) → else you set it in the table
 - Non-EUR rows use the Converted Amount when present, otherwise Amount × Exchange Rate

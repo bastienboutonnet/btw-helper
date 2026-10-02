@@ -244,12 +244,14 @@ function netInEur(row) {
 }
 
 // --- Tax names ---
-// Dutch input VAT comes in two names: the standard rate, worked out at the rate
-// in the form, and the reduced one (laag tarief), at 9% unless the row is
-// given a rate of its own.
+// Dutch input VAT comes in two kinds of name: the standard rate, worked out at
+// the rate in the form, and the reduced one (laag tarief) — any name with
+// "reduced", "laag" or "verlaagd" in it, as tax names are whatever was typed
+// into the expense system — at 9% unless the row is given a rate of its own.
 const REDUCED_RATE = 9;
-const isNlVat = tax => tax.startsWith("vat (nl") || tax.startsWith("reduced vat");
-const nameRate = tax => tax.startsWith("reduced vat") ? REDUCED_RATE : null;
+const isReduced = tax => /\b(reduced|laag|verlaagd)\b/.test(tax);
+const isNlVat = tax => tax.startsWith("vat (nl") || isReduced(tax);
+const nameRate = tax => isReduced(tax) ? REDUCED_RATE : null;
 
 // --- Classify a single row ---
 function classify(row, rcRate) {
@@ -288,13 +290,15 @@ function classify(row, rcRate) {
     } else {
       result.rubriek = inEu ? "4b" : "4a";
     }
-  } else if (isNlVat(tax)) {
+  } else if (isNlVat(tax) || row.vatRate !== null || row.vatRatio > 0) {
+    // A rate typed on the row (or VAT Bench says was on the bill) means it
+    // carried Dutch VAT, whatever its name.
     // NL input VAT (voorbelasting): deductible in 5b only.
     result.vatEur = vatOf(eur);
     result.rubriek = "5b";
   } else if (tax) {
     result.rubriek = "none";
-    result.flags.push(`Unrecognized Tax Name 1: "${row.tax}" — use Reverse Charge, VAT (NL) or Reduced VAT.`);
+    result.flags.push(`Unrecognized Tax Name 1: "${row.tax}" — use Reverse Charge, VAT (NL) or Reduced VAT, or type its VAT % if it is Dutch VAT.`);
   } else {
     result.rubriek = "none";
   }
@@ -486,6 +490,14 @@ document.querySelector("#rows tbody").addEventListener("blur", (e) => {
   else row[field] = raw;
   render();
 }, true);
+
+// Enter commits a cell rather than adding a line to it.
+document.querySelector("#rows tbody").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.matches("td[contenteditable]")) {
+    e.preventDefault();
+    e.target.blur();
+  }
+});
 
 // Country is a combobox <input>, committing on "change" (blur / Enter / pick).
 // Resolve the typed/picked text to a canonical code, then persist to the
