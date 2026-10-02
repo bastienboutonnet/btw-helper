@@ -150,7 +150,7 @@ td .country-input::placeholder { color: var(--muted); }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 tr.flagged td { background: rgba(242, 184, 75, 0.08); }
 .rubriek-tag { font-weight: 600; }
-.rubriek-4a { color: #f2b84b; }
+.rubriek-4a, .rubriek-2a { color: #f2b84b; }
 .rubriek-4b { color: #4f9cf9; }
 .rubriek-5b { color: #3ecf8e; }
 .rubriek-1a, .rubriek-1b, .rubriek-1c { color: #c792ea; }

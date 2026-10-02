@@ -44,7 +44,8 @@ the purchases side, and each replaces only its own.
 `Expense Currency`, `Expense Converted Amount`, optionally `Expense Exchange Rate`,
 `Expense Date`):
 
-- `Reverse Charge` → net + VAT at the form's rate into 4a/4b by country, the same VAT into 5b
+- `Reverse Charge` → net + VAT at the form's rate into 4a/4b by country, the same VAT into 5b.
+  A Dutch supplier (country NL) is domestic reverse charge and goes in **2a** instead
 - `VAT (NL)` → VAT at the form's rate into 5b only
 - `Reduced VAT`, `Reduced Rate VAT` — any name containing *reduced*, *laag* or
   *verlaagd* → VAT at 9% (laag tarief) into 5b only
@@ -62,7 +63,8 @@ columns `incurred`, `supplier`, `currency`, `net`, `vat`, `reverse_charge`,
 - Each bill's own `vat` is used, so a 9% bill stays 9% — the form's rate is ignored.
   The **VAT %** column shows the rate it works out to; typing one there overrides it
 - `reverse_charge = yes` → 4a/4b by `supplier_region` (`outside_eu` / `eu`); a country
-  picked in the table overrides it. No region → flagged
+  picked in the table overrides it — pick NL for a Dutch supplier, which makes it 2a
+  (Bench's region can't tell the Netherlands from the rest of the EU). No region → flagged
 - Any other bill with VAT → 5b
 - Bench cuts the export by the date on the bill, which is what a return is cut by
 - A bill given a rate in Bench arrives in EUR already. One without stays in its own

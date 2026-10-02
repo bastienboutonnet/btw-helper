@@ -293,9 +293,11 @@ function classify(row, rcRate) {
       result.rubriek = "none";
       result.flags.push(row.vatRatio !== null
         ? "Reverse charge, but Bench doesn't say where the supplier is — set the country here, or the supplier in Bench."
-        : "Reverse charge with no country — set 4a (non-EU) or 4b (EU).");
+        : "Reverse charge with no country — set it: NL goes in 2a, the EU in 4b, outside the EU in 4a.");
     } else {
-      result.rubriek = inEu ? "4b" : "4a";
+      // A Dutch supplier reversing the charge is the domestic scheme, 2a —
+      // not 4b, though the Netherlands is in the EU.
+      result.rubriek = row.country === "NL" ? "2a" : inEu ? "4b" : "4a";
     }
   } else if (isNlVat(tax) || row.vatRate !== null || row.vatRatio > 0) {
     // A rate typed on the row (or VAT Bench says was on the bill) means it
@@ -317,11 +319,12 @@ function classify(row, rcRate) {
 // period is the export's job — Bench and Invoice Ninja can both export a
 // quarter — so this page adds up what it was given, less what was set aside.
 function computeTotals(rows, rcRate) {
-  const t = { "4a-net": 0, "4a-vat": 0, "4b-net": 0, "4b-vat": 0, "5b": 0 };
+  const t = { "2a-net": 0, "2a-vat": 0, "4a-net": 0, "4a-vat": 0, "4b-net": 0, "4b-vat": 0, "5b": 0 };
   const classified = rows.map((r, i) => ({ row: r, c: classify(r, rcRate), i }));
   for (const { row, c } of classified) {
     if (row.excluded) continue;
-    if (c.rubriek === "4a") { t["4a-net"] += c.netEur; t["4a-vat"] += c.vatEur; t["5b"] += c.vatEur; }
+    if (c.rubriek === "2a") { t["2a-net"] += c.netEur; t["2a-vat"] += c.vatEur; t["5b"] += c.vatEur; }
+    else if (c.rubriek === "4a") { t["4a-net"] += c.netEur; t["4a-vat"] += c.vatEur; t["5b"] += c.vatEur; }
     else if (c.rubriek === "4b") { t["4b-net"] += c.netEur; t["4b-vat"] += c.vatEur; t["5b"] += c.vatEur; }
     else if (c.rubriek === "5b") { t["5b"] += c.vatEur; }
   }
@@ -434,15 +437,16 @@ function render() {
   // 5a is all the VAT owed — on sales, and the reverse-charged VAT on
   // purchases; 5c is what is left once the voorbelasting in 5b comes off it.
   const all = { ...totals, ...sales.totals };
-  all["5a"] = all["1a-vat"] + all["1b-vat"] + all["1c-vat"] + all["4a-vat"] + all["4b-vat"];
+  all["5a"] = all["1a-vat"] + all["1b-vat"] + all["1c-vat"] + all["2a-vat"] + all["4a-vat"] + all["4b-vat"];
   all["5c"] = all["5a"] - all["5b"];
   for (const [key, val] of Object.entries(all)) {
     const el = document.querySelector(`[data-t="${key}"]`);
     if (el) el.textContent = euro(key === "5c" ? Math.abs(val) : val);
   }
   document.getElementById("result-label").textContent = all["5c"] < 0 ? "5c · to reclaim" : "5c · to pay";
-  // 1c is rare; its boxes show only when something lands there.
+  // 1c and 2a are rare; their boxes show only when something lands there.
   document.querySelectorAll(".box-1c").forEach(b => { b.hidden = !all["1c-net"]; });
+  document.querySelectorAll(".box-2a").forEach(b => { b.hidden = !all["2a-net"]; });
 
   const flags = [];
   // An excluded row has nothing left to review.

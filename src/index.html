@@ -103,6 +103,18 @@
       </div>
       <h3 class="group">Purchases · reverse charge</h3>
       <div class="totals">
+      <div class="box box-2a">
+        <span class="label">2a · omzet
+          <span class="info" tabindex="0">i<span class="tip">Net of purchases from <strong>Dutch suppliers</strong> who reverse-charged the VAT to you (binnenlandse verlegging — e.g. subcontracting in construction).</span></span>
+        </span>
+        <span class="val" data-t="2a-net">&euro;0,00</span>
+      </div>
+      <div class="box box-2a">
+        <span class="label">2a · btw
+          <span class="info" tabindex="0">i<span class="tip">VAT on the 2a net. Declared here <strong>and</strong> deducted again in 5b, so it nets to &euro;0.</span></span>
+        </span>
+        <span class="val" data-t="2a-vat">&euro;0,00</span>
+      </div>
       <div class="box">
         <span class="label">4a · net
           <span class="info" tabindex="0" aria-label="4a net: net amount of purchases from outside the EU where the VAT is reverse-charged to you (btw verlegd).">i<span class="tip" aria-hidden="true">Net of purchases from <strong>outside the EU</strong> with VAT reverse-charged to you (<em>btw verlegd</em>). You report the net here.</span></span>
@@ -132,7 +144,7 @@
       <div class="totals">
       <div class="box">
         <span class="label">5a · verschuldigd
-          <span class="info" tabindex="0">i<span class="tip">All the VAT you owe: on your sales (1a–1c) <strong>plus</strong> the reverse-charged VAT on purchases (4a, 4b).</span></span>
+          <span class="info" tabindex="0">i<span class="tip">All the VAT you owe: on your sales (1a–1c) <strong>plus</strong> the reverse-charged VAT on purchases (2a, 4a, 4b).</span></span>
         </span>
         <span class="val" data-t="5a">&euro;0,00</span>
       </div>
@@ -220,7 +232,8 @@
         <li>
           <code>Reverse Charge</code> → net + computed VAT into
           <strong>4a</strong> (non-EU) or <strong>4b</strong> (EU) by vendor
-          country; the same VAT also goes into <strong>5b</strong>.
+          country — or <strong>2a</strong> for a Dutch supplier (domestic reverse
+          charge); the same VAT also goes into <strong>5b</strong>.
         </li>
         <li>
           <code>VAT (NL)</code> (default rate) and any name with <em>reduced</em>,
