@@ -108,8 +108,15 @@ function parseCSV(text) {
 //   bench: Bench's expense export (books → What went out → spreadsheet). It
 //          already knows each bill's VAT, whether the charge reversed and where
 //          the supplier is, so those are read rather than worked out.
+//
+// and one for the other side of the return:
+//
+//   invoices: Invoice Ninja's invoice report — what was billed, with the VAT
+//             each invoice charged. Its rows are sales, kept apart from the
+//             expenses, so dropping one file never replaces the other kind.
 function detectFormat(headers) {
   const set = new Set(headers.map(h => h.trim().toLowerCase()));
+  if (set.has("invoice invoice number") || (set.has("invoice amount") && set.has("invoice tax amount"))) return "invoices";
   if (["incurred", "supplier", "net", "vat", "reverse_charge"].every(h => set.has(h))) return "bench";
   if (set.has("expense net amount") || set.has("expense tax name 1")) return "ninja";
   return "unknown";
@@ -321,52 +328,147 @@ function computeTotals(rows, rcRate) {
   return { totals: t, classified };
 }
 
+// --- Sales: Invoice Ninja's invoice report ---
+// The VAT is what each invoice actually charged (`Invoice Tax Amount`), and the
+// net is the amount less it — so line-item taxes, discounts and surcharges are
+// all already in. A draft, cancelled or reversed invoice was never turnover, so
+// it arrives unticked. Ninja's exchange rate is client currency per euro; it
+// is turned round here into euros per unit, the way the expense side reads.
+const NOT_TURNOVER = new Set(["draft", "cancelled", "reversed"]);
+
+function buildInvoiceRows(headers, body) {
+  const col = name => headers.findIndex(h => h.trim().toLowerCase() === name);
+  const at = (cells, ...names) => {
+    for (const n of names) { const i = col(n); if (i !== -1) return (cells[i] || "").trim(); }
+    return "";
+  };
+  const has = name => col(name) !== -1;
+  return body.map(cells => {
+    const client = at(cells, "client name");
+    const amount = num(at(cells, "invoice amount"));
+    const vat = has("invoice tax amount") ? num(at(cells, "invoice tax amount"))
+      : amount - num(at(cells, "invoice subtotal"));
+    const currency = (at(cells, "invoice currency", "client currency") || "EUR").toUpperCase();
+    const ninjaRate = num(at(cells, "invoice exchange rate"));
+    const status = at(cells, "invoice status");
+    return {
+      date: at(cells, "invoice date"),
+      number: at(cells, "invoice invoice number", "invoice number"),
+      vendor: client,
+      country: resolveCountry(at(cells, "client country")) || vendorMap[client.toLowerCase()] || "",
+      currency,
+      net: Math.round((amount - vat) * 100) / 100,
+      vat,
+      exchangeRate: currency !== "EUR" && ninjaRate ? Math.round(1e6 / ninjaRate) / 1e6 : 0,
+      status,
+      excluded: NOT_TURNOVER.has(status.toLowerCase()),
+    };
+  });
+}
+
+// Which rubriek a sale belongs in. Taxed: by the rate it works out to — 21% in
+// 1a, 9% in 1b, anything else in 1c. Untaxed: by where the client is — the
+// Netherlands in 1e, another EU country in 3b (reverse-charged, and on the ICP
+// listing too), outside the EU nowhere: a service to a business there is taxed
+// there and is left off the Dutch return.
+function classifySale(row) {
+  const toEur = n => row.currency === "EUR" || !row.currency ? n
+    : row.exchangeRate ? Math.round(n * row.exchangeRate * 100) / 100 : n;
+  const result = { netEur: toEur(row.net), vatEur: toEur(row.vat), rubriek: "none", flags: [], rate: null };
+  if (row.currency !== "EUR" && !row.exchangeRate) {
+    result.flags.push(`No exchange rate for this ${row.currency} invoice — type euros per ${row.currency} in the Rate column.`);
+  }
+  if (Math.abs(row.vat) >= 0.005) {
+    const rate = row.net ? row.vat / row.net * 100 : 0;
+    result.rate = rate;
+    result.rubriek = Math.abs(rate - 21) < 0.5 ? "1a" : Math.abs(rate - REDUCED_RATE) < 0.5 ? "1b" : "1c";
+  } else if (!row.country) {
+    result.rate = 0;
+    result.flags.push("No VAT charged and no client country — set it: NL goes in 1e, the EU in 3b, outside the EU off the return.");
+  } else {
+    result.rate = 0;
+    result.rubriek = row.country === "NL" ? "1e" : EU_COUNTRIES.has(row.country) ? "3b" : "out";
+  }
+  return result;
+}
+
+function computeSalesTotals(rows) {
+  const t = { "1a-net": 0, "1a-vat": 0, "1b-net": 0, "1b-vat": 0, "1c-net": 0, "1c-vat": 0, "1e-net": 0, "3b-net": 0 };
+  const classified = rows.map((r, i) => ({ row: r, c: classifySale(r), i }));
+  for (const { row, c } of classified) {
+    if (row.excluded || !(`${c.rubriek}-net` in t)) continue;
+    t[`${c.rubriek}-net`] += c.netEur;
+    if (`${c.rubriek}-vat` in t) t[`${c.rubriek}-vat`] += c.vatEur;
+  }
+  return { totals: t, classified };
+}
+
 // --- Formatting ---
 const fmt = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" });
 function euro(n) { return fmt.format(n || 0); }
 
 // --- State + render ---
-let state = { rows: [], rcRate: 21, format: "" };
+let state = { rows: [], rcRate: 21, format: "", sales: [] };
 
 const FORMAT_LABELS = {
   bench: "Bench export — VAT, reverse charge and supplier region read from the file",
   ninja: "Invoice Ninja export — classified by Tax Name 1, VAT at each row's VAT %",
   unknown: "Columns not recognised — read as Invoice Ninja; check the rows below",
 };
+const SALES_LABEL = "Invoice Ninja invoice report — each invoice's own VAT, rubriek by its rate or the client's country";
+const RUBRIEK_TEXT = { none: "—", out: "not on return" };
 
 function render() {
   ensureCountryDatalist();
   const { totals, classified } = computeTotals(state.rows, state.rcRate);
+  const sales = computeSalesTotals(state.sales);
 
   const formatEl = document.getElementById("format");
-  formatEl.textContent = state.format ? `Read as: ${FORMAT_LABELS[state.format]}` : "";
+  formatEl.textContent = [
+    state.format && `Expenses read as: ${FORMAT_LABELS[state.format]}`,
+    state.sales.length && `Invoices read as: ${SALES_LABEL}`,
+  ].filter(Boolean).join(" · ");
   // The rate in the form only applies where the file doesn't bring its own.
   document.getElementById("rcRate").disabled = state.format === "bench";
 
-  for (const [key, val] of Object.entries(totals)) {
+  // 5a is all the VAT owed — on sales, and the reverse-charged VAT on
+  // purchases; 5c is what is left once the voorbelasting in 5b comes off it.
+  const all = { ...totals, ...sales.totals };
+  all["5a"] = all["1a-vat"] + all["1b-vat"] + all["1c-vat"] + all["4a-vat"] + all["4b-vat"];
+  all["5c"] = all["5a"] - all["5b"];
+  for (const [key, val] of Object.entries(all)) {
     const el = document.querySelector(`[data-t="${key}"]`);
-    if (el) el.textContent = euro(val);
+    if (el) el.textContent = euro(key === "5c" ? Math.abs(val) : val);
   }
+  document.getElementById("result-label").textContent = all["5c"] < 0 ? "5c · to reclaim" : "5c · to pay";
+  // 1c is rare; its boxes show only when something lands there.
+  document.querySelectorAll(".box-1c").forEach(b => { b.hidden = !all["1c-net"]; });
 
   const flags = [];
   // An excluded row has nothing left to review.
+  sales.classified.forEach(({ row, c, i }) => {
+    if (row.excluded) return;
+    c.flags.forEach(f => flags.push({ msg: `Invoice ${row.number || i + 1} · ${row.vendor || "—"}: ${f}` }));
+  });
   classified.forEach(({ row, c, i }) => {
     if (row.excluded) return;
-    c.flags.forEach(f => flags.push({ i, vendor: row.vendor, msg: f }));
+    c.flags.forEach(f => flags.push({ i, msg: `Row ${i + 1} · ${row.vendor || "—"}: ${f}` }));
   });
 
   const flagList = document.getElementById("flags");
   flagList.innerHTML = "";
   flags.forEach(f => {
     const li = document.createElement("li");
-    li.textContent = `Row ${f.i + 1} · ${f.vendor || "—"}: ${f.msg}`;
+    li.textContent = f.msg;
     flagList.appendChild(li);
   });
   document.getElementById("flagCount").textContent = flags.length;
 
+  renderSales(sales.classified);
+
   const tbody = document.querySelector("#rows tbody");
   tbody.innerHTML = "";
-  const flaggedRowIdx = new Set(flags.map(f => f.i));
+  const flaggedRowIdx = new Set(flags.filter(f => f.i !== undefined).map(f => f.i));
   classified.forEach(({ row, c, i }) => {
     const tr = document.createElement("tr");
     if (flaggedRowIdx.has(i)) tr.classList.add("flagged");
@@ -383,15 +485,53 @@ function render() {
     tr.appendChild(td(row.exchangeRate || "", "exchangeRate", true, true));
     tr.appendChild(td(euro(c.netEur), null, false, true));
     tr.appendChild(td(euro(c.vatEur), null, false, true));
-    const rub = document.createElement("td");
-    rub.innerHTML = row.excluded ? `<span class="rubriek-tag rubriek-none">excluded</span>`
-      : `<span class="rubriek-tag rubriek-${c.rubriek}">${c.rubriek === "none" ? "—" : c.rubriek}</span>`;
-    tr.appendChild(rub);
+    tr.appendChild(rubriekCell(row, c));
     tbody.appendChild(tr);
   });
-  const excluded = state.rows.filter(r => r.excluded).length;
-  document.getElementById("rowCount").textContent = excluded
-    ? `${state.rows.length - excluded} of ${state.rows.length}` : state.rows.length;
+  document.getElementById("rowCount").textContent = countText(state.rows);
+}
+
+// The invoices table: only there once an invoice report has been dropped.
+function renderSales(classified) {
+  document.getElementById("salesCard").hidden = !state.sales.length;
+  const tbody = document.querySelector("#sales tbody");
+  tbody.innerHTML = "";
+  classified.forEach(({ row, c, i }) => {
+    const tr = document.createElement("tr");
+    if (!row.excluded && c.flags.length) tr.classList.add("flagged");
+    if (row.excluded) tr.classList.add("excluded");
+    tr.dataset.i = i;
+    tr.appendChild(countCell(row));
+    tr.appendChild(td(row.date, "date"));
+    tr.appendChild(td(row.number, null, false));
+    tr.appendChild(td(row.vendor, null, false));
+    tr.appendChild(td(row.status, null, false));
+    tr.appendChild(countryCell(row));
+    tr.appendChild(td(row.net, "net", true, true));
+    tr.appendChild(td(row.currency, "currency"));
+    tr.appendChild(td(row.exchangeRate || "", "exchangeRate", true, true));
+    tr.appendChild(td(c.rate === null ? "" : String(Math.round(c.rate * 100) / 100), null, false, true));
+    tr.appendChild(td(euro(c.netEur), null, false, true));
+    tr.appendChild(td(euro(c.vatEur), null, false, true));
+    tr.appendChild(rubriekCell(row, c));
+    tbody.appendChild(tr);
+  });
+  document.getElementById("salesCount").textContent = countText(state.sales);
+}
+
+function rubriekCell(row, c) {
+  const cell = document.createElement("td");
+  const tag = document.createElement("span");
+  const rubriek = row.excluded ? "excluded" : c.rubriek;
+  tag.className = `rubriek-tag rubriek-${row.excluded || c.rubriek === "out" ? "none" : c.rubriek}`;
+  tag.textContent = RUBRIEK_TEXT[rubriek] || rubriek;
+  cell.appendChild(tag);
+  return cell;
+}
+
+function countText(rows) {
+  const excluded = rows.filter(r => r.excluded).length;
+  return excluded ? `${rows.length - excluded} of ${rows.length}` : rows.length;
 }
 
 function td(value, field, editable = true, numeric = false) {
@@ -468,13 +608,21 @@ function countryCell(row) {
 }
 
 // --- Edits recompute live ---
-document.querySelector("#rows tbody").addEventListener("blur", (e) => {
+// Both tables share these handlers; a row is found in whichever list its table
+// shows.
+const rowOf = el => {
+  const tr = el.closest("tr");
+  const list = tr.closest("table").id === "sales" ? state.sales : state.rows;
+  return list[Number(tr.dataset.i)];
+};
+const tables = document.querySelectorAll("#rows tbody, #sales tbody");
+const onRows = (type, fn, capture) => tables.forEach(t => t.addEventListener(type, fn, capture));
+
+onRows("blur", (e) => {
   const cell = e.target.closest("td[contenteditable]");
   if (!cell) return;
-  const tr = cell.closest("tr");
-  const i = Number(tr.dataset.i);
   const field = cell.dataset.field;
-  const row = state.rows[i];
+  const row = rowOf(cell);
   if (!row) return;
   const raw = cell.textContent.trim();
 
@@ -492,7 +640,7 @@ document.querySelector("#rows tbody").addEventListener("blur", (e) => {
 }, true);
 
 // Enter commits a cell rather than adding a line to it.
-document.querySelector("#rows tbody").addEventListener("keydown", (e) => {
+onRows("keydown", (e) => {
   if (e.key === "Enter" && e.target.matches("td[contenteditable]")) {
     e.preventDefault();
     e.target.blur();
@@ -502,18 +650,16 @@ document.querySelector("#rows tbody").addEventListener("keydown", (e) => {
 // Country is a combobox <input>, committing on "change" (blur / Enter / pick).
 // Resolve the typed/picked text to a canonical code, then persist to the
 // vendor->country map so the same vendor auto-fills next time.
-document.querySelector("#rows tbody").addEventListener("change", (e) => {
+onRows("change", (e) => {
   const box = e.target.closest("input[data-field='excluded']");
   if (box) {
-    const row = state.rows[Number(box.closest("tr").dataset.i)];
+    const row = rowOf(box);
     if (row) { row.excluded = !box.checked; render(); }
     return;
   }
   const input = e.target.closest("input[data-field='country']");
   if (!input) return;
-  const tr = input.closest("tr");
-  const i = Number(tr.dataset.i);
-  const row = state.rows[i];
+  const row = rowOf(input);
   if (!row) return;
   row.country = resolveCountry(input.value);
   if (row.vendor) { vendorMap[row.vendor.trim().toLowerCase()] = row.country; saveVendorMap(vendorMap); }
@@ -521,12 +667,21 @@ document.querySelector("#rows tbody").addEventListener("change", (e) => {
 });
 
 // --- File loading ---
+// An invoice report fills the sales side and an expense export the purchases
+// side; each replaces only its own, so the two can be dropped in either order
+// or together.
 function ingest(text) {
   const csv = parseCSV(text);
-  state.format = csv.length ? detectFormat(csv[0]) : "";
-  state.rows = buildRows(csv, state.format);
+  const format = csv.length ? detectFormat(csv[0]) : "";
+  if (format === "invoices") {
+    state.sales = buildInvoiceRows(csv[0], csv.slice(1));
+  } else {
+    state.format = format;
+    state.rows = buildRows(csv, format);
+  }
   render();
 }
+const ingestFiles = files => Promise.all([...files].map(f => f.text())).then(texts => texts.forEach(ingest));
 
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
@@ -538,12 +693,11 @@ dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag"));
 dropzone.addEventListener("drop", (e) => {
   e.preventDefault();
   dropzone.classList.remove("drag");
-  const file = e.dataTransfer.files[0];
-  if (file) file.text().then(ingest);
+  ingestFiles(e.dataTransfer.files);
 });
 fileInput.addEventListener("change", () => {
-  const file = fileInput.files[0];
-  if (file) file.text().then(ingest);
+  ingestFiles(fileInput.files);
+  fileInput.value = "";
 });
 
 document.getElementById("rcRate").addEventListener("input", (e) => {

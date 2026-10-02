@@ -77,8 +77,10 @@ button {
 .note p { margin: 0; color: var(--muted); }
 
 .totals {
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px;
 }
+.box[hidden] { display: none; }
+h3.group { color: var(--muted); font-size: 13px; font-weight: 600; margin: 0 0 8px; }
 .box {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 16px; display: flex; flex-direction: column; gap: 6px;
@@ -151,6 +153,8 @@ tr.flagged td { background: rgba(242, 184, 75, 0.08); }
 .rubriek-4a { color: #f2b84b; }
 .rubriek-4b { color: #4f9cf9; }
 .rubriek-5b { color: #3ecf8e; }
+.rubriek-1a, .rubriek-1b, .rubriek-1c { color: #c792ea; }
+.rubriek-1e, .rubriek-3b { color: #7fd1c7; }
 .rubriek-none { color: var(--muted); }
 
 .logic p { color: var(--muted); font-size: 13px; margin: 0; }
@@ -159,7 +163,6 @@ code { background: var(--card-2); border: 1px solid var(--border); border-radius
 .foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 32px; }
 
 @media (max-width: 720px) {
-  .totals { grid-template-columns: repeat(2, 1fr); }
   h1 { font-size: 26px; }
 }
 
@@ -169,3 +172,6 @@ td.inherited { color: var(--muted); }
 /* A row unticked from Count: kept in view, out of the totals. */
 tr.excluded td { opacity: 0.45; }
 tr.excluded td:first-child { opacity: 1; }
+
+/* The invoices table has more columns; a narrower country box keeps it in the card. */
+#sales .country-input { width: 115px; }

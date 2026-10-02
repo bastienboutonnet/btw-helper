@@ -11,21 +11,24 @@
     <p class="eyebrow">Kwartaal · Omzetbelasting</p>
     <h1>BTW Aangifte Helper</h1>
     <p class="lede">
-      Drop your expense export — from Invoice Ninja or from Bench — and it derives
-      the rubriek totals: 4a &amp; 4b for reverse-charge purchases, 5b for all
-      deductible input VAT. The format is recognised from the file's header row.
+      Drop your invoice report from Invoice Ninja and your expense export — from
+      Invoice Ninja or from Bench — and it derives the rubriek totals: 1a–1e and
+      3b for what you billed, 4a &amp; 4b for reverse-charge purchases, 5b for all
+      deductible input VAT, and what's left to pay. Each file is recognised from its
+      header row.
     </p>
 
     <section class="card">
-      <h2>Drop your CSV here</h2>
+      <h2>Drop your CSVs here</h2>
       <div id="dropzone" class="dropzone" tabindex="0" role="button"
            aria-label="Drop CSV file here or click to browse">
-        <p>or click to browse · the same export you get from your expense system</p>
+        <p>or click to browse · one file or both at once</p>
         <p class="hint">
-          Invoice Ninja's expense export, or Bench's (the books → What went out →
-          spreadsheet of bills dated in the quarter you're filing)
+          Invoices: Invoice Ninja's invoice report for the quarter. Expenses: Invoice
+          Ninja's expense export, or Bench's (the books → What went out → spreadsheet
+          of bills dated in the quarter you're filing)
         </p>
-        <input type="file" id="fileInput" accept=".csv,text/csv" hidden />
+        <input type="file" id="fileInput" accept=".csv,text/csv" multiple hidden />
       </div>
       <div class="controls">
         <button id="loadSample" type="button" class="btn-secondary">Load this quarter's sample</button>
@@ -46,7 +49,60 @@
       </p>
     </section>
 
-    <section class="totals" id="totals" aria-live="polite">
+    <section aria-live="polite">
+      <h3 class="group">Sales · what you billed</h3>
+      <div class="totals">
+      <div class="box">
+        <span class="label">1a · omzet
+          <span class="info" tabindex="0">i<span class="tip">Turnover billed at the <strong>21%</strong> rate, excluding VAT.</span></span>
+        </span>
+        <span class="val" data-t="1a-net">&euro;0,00</span>
+      </div>
+      <div class="box">
+        <span class="label">1a · btw
+          <span class="info" tabindex="0">i<span class="tip">The 21% VAT charged on it.</span></span>
+        </span>
+        <span class="val" data-t="1a-vat">&euro;0,00</span>
+      </div>
+      <div class="box">
+        <span class="label">1b · omzet
+          <span class="info" tabindex="0">i<span class="tip">Turnover billed at the <strong>9%</strong> rate (laag tarief), excluding VAT.</span></span>
+        </span>
+        <span class="val" data-t="1b-net">&euro;0,00</span>
+      </div>
+      <div class="box">
+        <span class="label">1b · btw
+          <span class="info" tabindex="0">i<span class="tip">The 9% VAT charged on it.</span></span>
+        </span>
+        <span class="val" data-t="1b-vat">&euro;0,00</span>
+      </div>
+      <div class="box box-1c">
+        <span class="label">1c · omzet
+          <span class="info" tabindex="0">i<span class="tip">Turnover at any <strong>other rate</strong> than 21%, 9% or 0%.</span></span>
+        </span>
+        <span class="val" data-t="1c-net">&euro;0,00</span>
+      </div>
+      <div class="box box-1c">
+        <span class="label">1c · btw
+          <span class="info" tabindex="0">i<span class="tip">The VAT charged on it.</span></span>
+        </span>
+        <span class="val" data-t="1c-vat">&euro;0,00</span>
+      </div>
+      <div class="box">
+        <span class="label">1e · omzet
+          <span class="info" tabindex="0">i<span class="tip">Turnover billed in the Netherlands with <strong>no VAT</strong> (0% or exempt).</span></span>
+        </span>
+        <span class="val" data-t="1e-net">&euro;0,00</span>
+      </div>
+      <div class="box">
+        <span class="label">3b · omzet
+          <span class="info" tabindex="0">i<span class="tip">Turnover billed to businesses in <strong>other EU countries</strong> with the VAT reverse-charged to them. Also goes on your ICP listing (opgaaf intracommunautaire prestaties).</span></span>
+        </span>
+        <span class="val" data-t="3b-net">&euro;0,00</span>
+      </div>
+      </div>
+      <h3 class="group">Purchases · reverse charge</h3>
+      <div class="totals">
       <div class="box">
         <span class="label">4a · net
           <span class="info" tabindex="0" aria-label="4a net: net amount of purchases from outside the EU where the VAT is reverse-charged to you (btw verlegd).">i<span class="tip" aria-hidden="true">Net of purchases from <strong>outside the EU</strong> with VAT reverse-charged to you (<em>btw verlegd</em>). You report the net here.</span></span>
@@ -71,11 +127,27 @@
         </span>
         <span class="val" data-t="4b-vat">&euro;0,00</span>
       </div>
-      <div class="box highlight">
+      </div>
+      <h3 class="group">Result</h3>
+      <div class="totals">
+      <div class="box">
+        <span class="label">5a · verschuldigd
+          <span class="info" tabindex="0">i<span class="tip">All the VAT you owe: on your sales (1a–1c) <strong>plus</strong> the reverse-charged VAT on purchases (4a, 4b).</span></span>
+        </span>
+        <span class="val" data-t="5a">&euro;0,00</span>
+      </div>
+      <div class="box">
         <span class="label">5b · voorbelasting
-          <span class="info" tabindex="0" aria-label="5b voorbelasting: total deductible input VAT. Your NL input VAT plus the reverse-charge VAT from 4a and 4b.">i<span class="tip" aria-hidden="true">Total <strong>deductible input VAT</strong> (voorbelasting): your NL input VAT <strong>plus</strong> the reverse-charge VAT from 4a and 4b.</span></span>
+          <span class="info" tabindex="0">i<span class="tip">Total <strong>deductible input VAT</strong> (voorbelasting): your NL input VAT <strong>plus</strong> the reverse-charge VAT from 4a and 4b.</span></span>
         </span>
         <span class="val" data-t="5b">&euro;0,00</span>
+      </div>
+      <div class="box highlight">
+        <span class="label"><span id="result-label">5c · to pay</span>
+          <span class="info" tabindex="0">i<span class="tip">5a less 5b: what you pay, or get back when 5b is the larger.</span></span>
+        </span>
+        <span class="val" data-t="5c">&euro;0,00</span>
+      </div>
       </div>
     </section>
 
@@ -84,8 +156,25 @@
       <ul id="flags" class="flags"></ul>
     </section>
 
+    <section class="card" id="salesCard" hidden>
+      <h3>Invoices · untick one to leave it out, set the country of a client billed without VAT
+        <span id="salesCount" class="count">0</span></h3>
+      <div class="table-scroll">
+        <table id="sales">
+          <thead>
+            <tr>
+              <th>Count</th><th>Date</th><th>Number</th><th>Client</th><th>Status</th>
+              <th>Country</th><th>Net</th><th>Cur</th><th>Rate</th><th>VAT %</th>
+              <th>Net (&euro;)</th><th>VAT (&euro;)</th><th>Rubriek</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
     <section class="card">
-      <h3>All rows · edit any cell to correct it, untick one to leave it out; totals recompute live
+      <h3>Expenses · edit any cell to correct it, untick one to leave it out; totals recompute live
         <span id="rowCount" class="count">0</span></h3>
       <div class="table-scroll">
         <table id="rows">
@@ -104,6 +193,16 @@
     <section class="card logic">
       <h3>How it works</h3>
       <ul class="logic-list">
+        <li>
+          <strong>Invoices</strong> (Invoice Ninja's invoice report): each invoice's
+          own VAT is used, and the net is its amount less that VAT. The rate it works
+          out to picks the rubriek — 21% <strong>1a</strong>, 9% <strong>1b</strong>,
+          any other <strong>1c</strong>. Billed without VAT, the client's country
+          decides: the Netherlands <strong>1e</strong>, another EU country
+          <strong>3b</strong>, outside the EU nowhere — a service to a business there
+          is taxed there and stays off the Dutch return. Drafts, cancelled and reversed
+          invoices start unticked. VAT is due on the invoice date, paid or not.
+        </li>
         <li>
           The file's header row decides how it is read. <strong>Invoice Ninja</strong>:
           classification follows <code>Expense Tax Name 1</code> and VAT is computed
@@ -137,6 +236,10 @@
           Non-EUR rows use the Converted Amount when present, otherwise Amount ×
           Exchange Rate. A Bench bill given a rate in Bench arrives already in EUR;
           one without is flagged until you type a rate in the table.
+        </li>
+        <li>
+          <strong>5a</strong> is the VAT on sales plus the reverse-charged VAT on
+          purchases; <strong>5c</strong> is 5a less 5b.
         </li>
         <li>
           Nothing is filed automatically — this only computes the numbers you

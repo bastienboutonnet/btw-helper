@@ -1,15 +1,19 @@
 # BTW Aangifte Helper
 
 A single-page tool for preparing your quarterly Dutch VAT return (omzetbelasting).
-Drop an expense CSV export — from **Invoice Ninja** or from **Bench** — and it derives
-the rubriek totals: **4a** and **4b** for reverse-charge purchases, **5b** for all
-deductible input VAT (voorbelasting).
+Drop your **Invoice Ninja invoice report** and an expense CSV export — from **Invoice
+Ninja** or from **Bench** — and it derives the rubriek totals: **1a–1e** and **3b** for
+what you billed, **4a** and **4b** for reverse-charge purchases, **5b** for all
+deductible input VAT (voorbelasting), and **5a / 5c** — what you owe and what's left
+to pay or reclaim.
 
 Everything runs client-side in the browser. **Nothing is uploaded and nothing is
 filed** — it only computes the numbers you then type into Mijn Belastingdienst.
 
 ## What it does
 
+- **1a / 1b / 1c** — sales at 21%, 9%, or any other rate; **1e** — sales in NL without
+  VAT; **3b** — sales to EU businesses, reverse-charged
 - **4a / 4b** — reverse-charge purchases, split by where the supplier is (4a non-EU, 4b EU)
 - **5b** — all deductible input VAT, including the reverse-charge VAT (which nets to €0
   but must appear in both boxes)
@@ -19,7 +23,22 @@ filed** — it only computes the numbers you then type into Mijn Belastingdienst
 
 ## Input formats
 
-The format is recognised from the header row, never guessed column by column.
+The format is recognised from the header row, never guessed column by column. Drop
+one file or several at once: an invoice report fills the sales side, an expense export
+the purchases side, and each replaces only its own.
+
+**Invoice Ninja invoice report** (Reports → Invoices, for the quarter; columns
+`Client Name`, `Invoice Invoice Number`, `Invoice Amount`, `Invoice Tax Amount`,
+`Invoice Date`, `Invoice Status`, `Invoice Exchange Rate`, optionally `Client Country`):
+
+- Each invoice's own `Invoice Tax Amount` is used; the net is the amount less it
+- The rate that works out to picks the rubriek: ~21% → 1a, ~9% → 1b, any other → 1c
+- No VAT charged → by client country: NL → 1e, another EU country → 3b (also on your
+  ICP listing), outside the EU → not on the return (a service to a business there is
+  taxed there). No country known → flagged until you set it; it's remembered per client
+- Draft, cancelled and reversed invoices start unticked
+- Non-EUR invoices are converted with Ninja's exchange rate (shown as euros per unit)
+- VAT is due on the invoice date, paid or not — export by invoice date
 
 **Invoice Ninja** (`Expense Vendor`, `Expense Net Amount`, `Expense Tax Name 1`,
 `Expense Currency`, `Expense Converted Amount`, optionally `Expense Exchange Rate`,
